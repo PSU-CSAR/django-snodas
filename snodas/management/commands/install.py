@@ -516,7 +516,7 @@ class Install(object):
         )
 
     def execute(self, *args, **options):
-        if os.path.basename(sys.argv[0]) == 'ebagis':
+        if os.path.basename(sys.argv[0]) == 'snodas':
             self.snodas_command_error()
             return 1
 
