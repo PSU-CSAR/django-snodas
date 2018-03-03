@@ -1,0 +1,3 @@
+recursive-include snodas *
+include *.md
+include *.txt

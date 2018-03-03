@@ -1,0 +1,2 @@
+class snodasError(Exception):
+    pass
