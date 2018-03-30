@@ -49,8 +49,8 @@ def main():
             'GDAL>=2.1.0',
             'djangorestframework-gis>=0.11.0',
             'django-split-settings>=0.2.4',
-#            'pyyaml>=3.12',
-#            'six>=1.10.0',
+            'pyyaml>=3.12',
+            'six>=1.10.0',
         ],
         extras_require={
             'CORS': ['django-cors-headers>=2.0.2'],

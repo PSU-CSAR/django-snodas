@@ -68,6 +68,7 @@ ebagis/settings/local_settings.py
 touch_this_file_to_update_cgi.txt
 
 # Other
+.python-version
 *.db
 *~
 .DS_Store
