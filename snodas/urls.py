@@ -9,6 +9,8 @@ from . import views
 rest_urls = [
     url(r"^tiles/$", views.list_tiles),
     url(r"^tiles/(?P<date>\d{4}-\d{2}-\d{2})/(?P<zoom>\d{1,2})/(?P<x>\d+)/(?P<y>\d+).(?P<format>png|jpg|jpeg)$", views.get_tile),
+    url(r"^query/(?P<start_year>\d{4})/(?P<end_year>\d{4})/(?P<month>\d{1,2})/(?P<day>\d{1,2})/$", views.get_stats_date),
+    url(r"^query/(?P<start_year>\d{4})/(?P<end_year>\d{4})/(?P<doy>\d{1-3})/$", views.get_stats_doy),
 ]
 
 # standard django url patterns
