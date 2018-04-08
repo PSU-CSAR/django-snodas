@@ -5,14 +5,14 @@
 INSTALLED_APPS += ('corsheaders', )
 
 CORS_ORIGIN_WHITELIST = (
-    'localhost:3000',
+    'localhost',
 )
 
-# we only want to allow access to the api
-CORS_URLS_REGEX = r'^/api/.*$'
+# we allow access to everything
+CORS_URLS_REGEX = r'^/*$'
 
 # we can also allow cookies, but this is a security risk
 # and doesn't seem to be necessary
 #CORS_ALLOW_CREDENTIALS = True
 
-MIDDLEWARE_CLASSES = ('corsheaders.middleware.CorsMiddleware', )
+MIDDLEWARE_CLASSES += ('corsheaders.middleware.CorsMiddleware', )

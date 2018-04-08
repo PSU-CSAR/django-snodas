@@ -30,13 +30,11 @@ settings_files = [
     'base.py',
     'caching.py',
     'database.py',
-    'snodas.py',
     'logging.py',
-    'rest.py',
 ]
 
 # add the env-specific settings and any additional settings
-settings_files.append(optional(ENV+'.py'))
+#settings_files.append(optional(ENV+'.py'))
 settings_files.extend(conf_settings.get('ADDITIONAL_SETTING_FILES', []))
 
 # always use the local settings file if present
