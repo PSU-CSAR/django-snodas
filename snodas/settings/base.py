@@ -23,9 +23,7 @@ INSTALLED_APPS = (
     'snodas',
 
     # django libs
-    'django.contrib.staticfiles',
     'django.contrib.gis',
-    'django.contrib.sites',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -71,10 +69,6 @@ STATICFILES_FINDERS = (
 MIGRATION_MODULES = {
     'sites': 'snodas.fixtures.sites_migrations',
 }
-
-
-# django sites
-SITE_ID = 1
 
 
 # project-wide email settings
