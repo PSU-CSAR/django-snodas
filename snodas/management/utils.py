@@ -3,8 +3,10 @@ from __future__ import absolute_import
 import os
 import random
 import string
+import yaml
 
 
+CONF_FILE_NAME = 'project.conf'
 SETTINGS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
     'settings',
@@ -87,3 +89,14 @@ def get_settings_file(file_name=None):
             file_name,
         )
     return SETTINGS_DIR
+
+
+def load_conf_file(config=os.path.join(get_project_root(), CONF_FILE_NAME)):
+    try:
+        with open(config, 'r') as f:
+            return yaml.safe_load(f)
+    except (IOError, OSError):
+        raise Exception((
+            'Could not load project configuration file {}. '
+            'Have you installed this snodas instance?'
+        ).format(config))

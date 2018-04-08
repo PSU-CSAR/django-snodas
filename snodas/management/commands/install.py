@@ -2,7 +2,6 @@ from __future__ import absolute_import, print_function
 
 import os
 import sys
-import yaml
 import argparse
 import subprocess
 import warnings
@@ -29,15 +28,6 @@ try:
     from .. import utils
 except ValueError:
     import utils
-
-
-get_default = utils.get_default
-
-CONF_FILE_NAME = 'project.conf'
-CONF_FILE = os.path.join(
-    utils.get_project_root(),
-    CONF_FILE_NAME,
-)
 
 
 class remove_const(argparse.Action):
@@ -86,17 +76,6 @@ def get_password(prompt):
     return first
 
 
-def load_conf_file(conf_path=CONF_FILE):
-    try:
-        with open(conf_path, 'r') as f:
-            return yaml.safe_load(f)
-    except (IOError, OSError):
-        raise Exception((
-            'Could not load project configuration file {}. '
-            'Have you installed this snodas instance?'
-        ).format(conf_path))
-
-
 # this class is a "pseudo-command": it is structured similarly
 # to a django managment command, and borrows some portions of
 # django.core.management.Command for familiarity. However, it
@@ -110,7 +89,7 @@ class Install(object):
         pass
 
     def default_conf_file(self):
-        return os.path.join(utils.get_project_root(), CONF_FILE_NAME)
+        return os.path.join(utils.get_project_root(), utils.CONF_FILE_NAME)
 
     def get_version(self):
         from setup import get_version as gv
@@ -247,7 +226,7 @@ class Install(object):
             '--no-env',
             dest='make_env',
             action='store_false',
-            help=('Don''t make a conda env, '
+            help=('Don\'t make a conda env, '
                   'just intall to the current python. '
                   'Default is to make a new conda env.'),
         )
@@ -264,12 +243,6 @@ class Install(object):
             default='conda-requirements.txt',
             help=('File listing packages to install with conda. '
                   'Default is conda-requirements.txt'),
-        )
-        parser.add_argument(
-            '--reuse-env',
-            action='store_true',
-            help=('Don\'t raise an error if conda env with instance '
-                  'name already exists. Default is to fail.'),
         )
         parser.add_argument(
             '--python-version',
@@ -344,7 +317,7 @@ class Install(object):
             settings['ENV'] == 'development' or options.get('DEBUG')
         )
 
-        settings['INSTANCE_NAME'] = get_default(
+        settings['INSTANCE_NAME'] = utils.get_default(
             options,
             'instance_name',
             utils.get_instance_name(),
@@ -355,38 +328,38 @@ class Install(object):
                 'Could not extract instance name from path and none specified.'
              )
 
-        settings['SECRET_KEY'] = get_default(
+        settings['SECRET_KEY'] = utils.get_default(
             options,
             'secret_key',
             utils.generate_secret_key(options.get('secret_key_length'))
         )
 
-        settings['DATABASE_NAME'] = get_default(
+        settings['DATABASE_NAME'] = utils.get_default(
             options,
             'db_name',
             settings['INSTANCE_NAME'],
         )
-        settings['DATABASE_USER'] = get_default(
+        settings['DATABASE_USER'] = utils.get_default(
             options,
             'db_user',
-            settings['INSTANCE_NAME'],
+            settings['DATABASE_NAME'],
         )
-        settings['DATABASE_PASSWORD'] = get_default(
+        settings['DATABASE_PASSWORD'] = utils.get_default(
             options,
             'db_password',
             get_password('Please enter the database user password: '),
         )
-        settings['DATABASE_HOST'] = get_default(options, 'db_host', None)
-        settings['DATABASE_PORT'] = get_default(options, 'db_port', None)
+        settings['DATABASE_HOST'] = utils.get_default(options, 'db_host', None)
+        settings['DATABASE_PORT'] = utils.get_default(options, 'db_port', None)
 
 
-        settings['SITE_DOMAIN_NAME'] = get_default(
+        settings['SITE_DOMAIN_NAME'] = utils.get_default(
             options,
             'domain',
             input('Enter in the domain name for this project instance: '),
         )
 
-        settings['ADDITIONAL_SETTINGS_FILES'] = get_default(
+        settings['ADDITIONAL_SETTINGS_FILES'] = utils.get_default(
             options,
             'additional_settings_file',
             [],
@@ -526,7 +499,7 @@ class Install(object):
 
         self.verbosity = options.get('verbosity')
 
-        self.output_file = get_default(
+        self.output_file = utils.get_default(
             options,
             'output_file',
             self.default_conf_file(),
@@ -537,13 +510,8 @@ class Install(object):
         conf_exists = os.path.isfile(self.output_file)
 
         if options.get('no_configure') and conf_exists:
-            self.vprint(
-                1,
-                'Reusing existing configuration from {}'.format(
-                    self.default_conf_file()
-                ),
-            )
-            self.settings = load_conf_file()
+            self.vprint(1,'Reusing existing configuration from {}'.format(self.output_file))
+            self.settings = utils.load_conf_file(self.output_file)
         elif options.get('no_configure') and not conf_exists:
             print('ERROR: no-configure option specified '
                   'but configuration file does not exist.')
