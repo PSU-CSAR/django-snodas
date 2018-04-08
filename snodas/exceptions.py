@@ -1,2 +1,2 @@
-class snodasError(Exception):
+class SNODASError(Exception):
     pass

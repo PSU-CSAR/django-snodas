@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import argparse
 import os
 import random
 import string
@@ -11,6 +12,11 @@ SETTINGS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
     'settings',
 )
+
+
+def to_namedtuple(dictionary):
+    from collections import namedtuple
+    return namedtuple('GenericDict', dictionary.keys())(**dictionary)
 
 
 def get_default(dictionary, key, default=None):
@@ -100,3 +106,27 @@ def load_conf_file(config=os.path.join(get_project_root(), CONF_FILE_NAME)):
             'Could not load project configuration file {}. '
             'Have you installed this snodas instance?'
         ).format(config))
+
+
+class FullPaths(argparse.Action):
+    """Expand user- and relative-paths"""
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, os.path.abspath(os.path.expanduser(values)))
+
+
+def is_dir(dirname):
+    """Checks if a path is an actual directory"""
+    if not os.path.isdir(dirname):
+        msg = "{0} is not a directory".format(dirname)
+        raise argparse.ArgumentTypeError(msg)
+    else:
+        return dirname
+
+
+def is_file(name):
+    """Checks if a path is an actual file"""
+    if not os.path.isfile(name):
+        msg = "{0} is not a file".format(name)
+        raise argparse.ArgumentTypeError(msg)
+    else:
+        return name
