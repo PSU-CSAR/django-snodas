@@ -50,7 +50,7 @@ AUTH_USER_MODEL = 'auth.User'
 
 ## URL PATH SETTINGS
 # settings for rest framework
-REST_ROOT = "/"
+REST_ROOT = ""
 
 
 STATIC_URL = '/static/'

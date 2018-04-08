@@ -4,9 +4,10 @@ from django.conf.urls import include, url
 
 from .settings import REST_ROOT, DEBUG, INSTALLED_APPS
 
+from . import views
 
 rest_urls = [
-
+    url(r"^tiles/$", views.list_tiles),
 ]
 
 # standard django url patterns
