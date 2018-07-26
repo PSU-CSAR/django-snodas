@@ -46,6 +46,106 @@ def get_tile(request, date, zoom, x, y, format):
     return HttpResponse(row[0], content_type='application/{}'.format(format.lower))
 
 
+def get_pourpoint_tile(request, zoom, x, y):
+    if request.method != 'GET':
+        return HttpResponse(reason="Not allowed", status=405)
+
+#    tolerance = 100
+
+#    query_points = \
+#'''SELECT (
+#  SELECT ST_AsMVT(points)
+#  FROM (
+#    SELECT
+#      id,
+#      name,
+#      source,
+#      ST_AsMVTGeom(
+#        geom,
+#        tile,
+#        4096,
+#        100,
+#        true
+#      ) AS geom
+#      FROM (
+#        SELECT
+#          pourpoint.id as id,
+#          pourpoint.name as name,
+#          pourpoint.source as source,
+#          st_transform(pourpoint.point, 3857) as geom,
+#          tile.extent as tile
+#        FROM pourpoint, (select (%s, %s, %s)::tms_tilecoordz::geometry as extent) as tile
+#        WHERE
+#          st_transform(tile.extent, 4326) && pourpoint.point
+#      ) as point
+#  ) AS points) ||
+#  (SELECT ST_AsMVT(polygons)
+#  FROM (
+#    SELECT
+#      id,
+#      name,
+#      source,
+#      ST_AsMVTGeom(
+#        geom,
+#        tile,
+#        4096,
+#        100,
+#        true
+#      ) AS geom
+#      FROM (
+#        SELECT
+#          pourpoint.id as id,
+#          pourpoint.name as name,
+#          pourpoint.source as source,
+#          st_transform(st_simplifypreservetopology(pourpoint.polygon_simple, %s / (2^%s * 4096)), 3857) as geom,
+#          tile.extent as tile
+#        FROM pourpoint, (select (%s, %s, %s)::tms_tilecoordz::geometry as extent) as tile
+#        WHERE
+#          st_transform(tile.extent, 4326) && pourpoint.polygon_simple AND
+#          pourpoint.polygon_simple is not Null
+#      ) as poly
+#  ) AS polygons)'''
+
+    query = 'SELECT get_pourpoint_tile(%s, %s, %s);'
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            query,
+            [x, y, zoom],
+        )
+        tile = cursor.fetchone()
+       # cursor.execute(
+       #     query_polygons,
+       #     [tolerance, zoom, x, y, zoom],
+       # )
+       # polygons = cursor.fetchone()
+
+#    if points and polygons:
+#        tile = points[0] + polygons[0]
+#    elif not points:
+#        tile = polygons[0]
+#    elif not polygons:
+#        tile = points[0]
+#    else:
+    if not tile:
+        return HttpResponse(status=404)
+
+    return HttpResponse(tile[0], content_type='application/vnd.mapbox-vector-tile')
+
+
+def get_file(request, zoom, x, y):
+    if request.method != 'GET':
+        return HttpResponse(reason="Not allowed", status=405)
+
+    try:
+        with open('./{zoom}_{x}_{y}.mvt'.format(zoom=zoom, x=x, y=y)) as t:
+            tile = t.read()
+    except IOError:
+        return HttpResponse(status=404)
+
+    return HttpResponse(tile, content_type='application/vnd.mapbox-vector-tile')
+
+
 def validate_geojson(geom):
     try:
         if geom['type'] == 'FeatureCollection':

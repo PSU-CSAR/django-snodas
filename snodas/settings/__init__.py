@@ -31,6 +31,7 @@ settings_files = [
     'caching.py',
     'database.py',
     'logging.py',
+    'cors.py',
 ]
 
 # add the env-specific settings and any additional settings
