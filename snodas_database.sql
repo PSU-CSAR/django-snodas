@@ -38,7 +38,7 @@ CREATE TABLE "snodas" (
   CONSTRAINT enforce_out_db_swe CHECK (_raster_constraint_out_db(swe) = '{f}'::boolean[]),
   CONSTRAINT enforce_pixel_types_swe CHECK (_raster_constraint_pixel_types(swe) = '{16BSI}'::text[]),
   CONSTRAINT enforce_scalex_swe CHECK (st_scalex(swe)::numeric(25,10) = 0.00833333333333328::numeric(25,10)),
-  CONSTRAINT enforce_scaley_swe CHECK (st_scaley(swe)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10))
+  CONSTRAINT enforce_scaley_swe CHECK (st_scaley(swe)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10)),
   -- depth constraints
   CONSTRAINT enforce_height_depth CHECK (st_height(depth) = 3351),
   CONSTRAINT enforce_nodata_values_depth CHECK (_raster_constraint_nodata_values(depth)::numeric(16,10)[] = '{-9999}'::numeric(16,10)[]),
@@ -46,7 +46,7 @@ CREATE TABLE "snodas" (
   CONSTRAINT enforce_out_db_depth CHECK (_raster_constraint_out_db(depth) = '{f}'::boolean[]),
   CONSTRAINT enforce_pixel_types_depth CHECK (_raster_constraint_pixel_types(depth) = '{16BSI}'::text[]),
   CONSTRAINT enforce_scalex_depth CHECK (st_scalex(depth)::numeric(25,10) = 0.00833333333333328::numeric(25,10)),
-  CONSTRAINT enforce_scaley_depth CHECK (st_scaley(depth)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10))
+  CONSTRAINT enforce_scaley_depth CHECK (st_scaley(depth)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10)),
   -- runoff constraints
   CONSTRAINT enforce_height_runoff CHECK (st_height(runoff) = 3351),
   CONSTRAINT enforce_nodata_values_runoff CHECK (_raster_constraint_nodata_values(runoff)::numeric(16,10)[] = '{-9999}'::numeric(16,10)[]),
@@ -54,7 +54,7 @@ CREATE TABLE "snodas" (
   CONSTRAINT enforce_out_db_runoff CHECK (_raster_constraint_out_db(runoff) = '{f}'::boolean[]),
   CONSTRAINT enforce_pixel_types_runoff CHECK (_raster_constraint_pixel_types(runoff) = '{16BSI}'::text[]),
   CONSTRAINT enforce_scalex_runoff CHECK (st_scalex(runoff)::numeric(25,10) = 0.00833333333333328::numeric(25,10)),
-  CONSTRAINT enforce_scaley_runoff CHECK (st_scaley(runoff)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10))
+  CONSTRAINT enforce_scaley_runoff CHECK (st_scaley(runoff)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10)),
   -- sublimation constraints
   CONSTRAINT enforce_height_sublimation CHECK (st_height(sublimation) = 3351),
   CONSTRAINT enforce_nodata_values_sublimation CHECK (_raster_constraint_nodata_values(sublimation)::numeric(16,10)[] = '{-9999}'::numeric(16,10)[]),
@@ -62,7 +62,7 @@ CREATE TABLE "snodas" (
   CONSTRAINT enforce_out_db_sublimation CHECK (_raster_constraint_out_db(sublimation) = '{f}'::boolean[]),
   CONSTRAINT enforce_pixel_types_sublimation CHECK (_raster_constraint_pixel_types(sublimation) = '{16BSI}'::text[]),
   CONSTRAINT enforce_scalex_sublimation CHECK (st_scalex(sublimation)::numeric(25,10) = 0.00833333333333328::numeric(25,10)),
-  CONSTRAINT enforce_scaley_sublimation CHECK (st_scaley(sublimation)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10))
+  CONSTRAINT enforce_scaley_sublimation CHECK (st_scaley(sublimation)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10)),
   -- sublimation_blowing constraints
   CONSTRAINT enforce_height_sublimation_blowing CHECK (st_height(sublimation_blowing) = 3351),
   CONSTRAINT enforce_nodata_values_sublimation_blowing CHECK (_raster_constraint_nodata_values(sublimation_blowing)::numeric(16,10)[] = '{-9999}'::numeric(16,10)[]),
@@ -70,7 +70,7 @@ CREATE TABLE "snodas" (
   CONSTRAINT enforce_out_db_sublimation_blowing CHECK (_raster_constraint_out_db(sublimation_blowing) = '{f}'::boolean[]),
   CONSTRAINT enforce_pixel_types_sublimation_blowing CHECK (_raster_constraint_pixel_types(sublimation_blowing) = '{16BSI}'::text[]),
   CONSTRAINT enforce_scalex_sublimation_blowing CHECK (st_scalex(sublimation_blowing)::numeric(25,10) = 0.00833333333333328::numeric(25,10)),
-  CONSTRAINT enforce_scaley_sublimation_blowing CHECK (st_scaley(sublimation_blowing)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10))
+  CONSTRAINT enforce_scaley_sublimation_blowing CHECK (st_scaley(sublimation_blowing)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10)),
   -- precip_solid constraints
   CONSTRAINT enforce_height_precip_solid CHECK (st_height(precip_solid) = 3351),
   CONSTRAINT enforce_nodata_values_precip_solid CHECK (_raster_constraint_nodata_values(precip_solid)::numeric(16,10)[] = '{-9999}'::numeric(16,10)[]),
@@ -78,7 +78,7 @@ CREATE TABLE "snodas" (
   CONSTRAINT enforce_out_db_precip_solid CHECK (_raster_constraint_out_db(precip_solid) = '{f}'::boolean[]),
   CONSTRAINT enforce_pixel_types_precip_solid CHECK (_raster_constraint_pixel_types(precip_solid) = '{16BSI}'::text[]),
   CONSTRAINT enforce_scalex_precip_solid CHECK (st_scalex(precip_solid)::numeric(25,10) = 0.00833333333333328::numeric(25,10)),
-  CONSTRAINT enforce_scaley_precip_solid CHECK (st_scaley(precip_solid)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10))
+  CONSTRAINT enforce_scaley_precip_solid CHECK (st_scaley(precip_solid)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10)),
   -- precip_liquid constraints
   CONSTRAINT enforce_height_precip_liquid CHECK (st_height(precip_liquid) = 3351),
   CONSTRAINT enforce_nodata_values_precip_liquid CHECK (_raster_constraint_nodata_values(precip_liquid)::numeric(16,10)[] = '{-9999}'::numeric(16,10)[]),
@@ -86,7 +86,7 @@ CREATE TABLE "snodas" (
   CONSTRAINT enforce_out_db_precip_liquid CHECK (_raster_constraint_out_db(precip_liquid) = '{f}'::boolean[]),
   CONSTRAINT enforce_pixel_types_precip_liquid CHECK (_raster_constraint_pixel_types(precip_liquid) = '{16BSI}'::text[]),
   CONSTRAINT enforce_scalex_precip_liquid CHECK (st_scalex(precip_liquid)::numeric(25,10) = 0.00833333333333328::numeric(25,10)),
-  CONSTRAINT enforce_scaley_precip_liquid CHECK (st_scaley(precip_liquid)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10))
+  CONSTRAINT enforce_scaley_precip_liquid CHECK (st_scaley(precip_liquid)::numeric(25,10) = (-0.00833333333333333)::numeric(25,10)),
   -- average_temp constraints
   CONSTRAINT enforce_height_average_temp CHECK (st_height(average_temp) = 3351),
   CONSTRAINT enforce_nodata_values_average_temp CHECK (_raster_constraint_nodata_values(average_temp)::numeric(16,10)[] = '{-9999}'::numeric(16,10)[]),
@@ -424,14 +424,13 @@ $$;
 -- new pourpoint with polygon and no simplification
 CREATE TRIGGER pourpoint_insert_simplify_trigger
 BEFORE INSERT ON pourpoint
-FOR EACH ROW
-WHEN (NEW.polygon is not NULL AND NEW.polygon_simple is NULL)
-EXECUTE PROCEDURE pourpoint_simplify();
+FOR EACH ROW WHEN (
+  NEW.polygon is not NULL AND NEW.polygon_simple is NULL
+) EXECUTE PROCEDURE pourpoint_simplify();
 
 CREATE TRIGGER pourpoint_insert_area_trigger
 BEFORE INSERT ON pourpoint
-FOR EACH ROW
-WHEN (NEW.polygon is not NULL)
+FOR EACH ROW WHEN (NEW.polygon is not NULL)
 EXECUTE PROCEDURE calc_polygon_area();
 
 -- update on pourpoint with new polygon
@@ -470,47 +469,20 @@ FOR EACH ROW WHEN (
 
 -- need the parameters for snodas rasters
 CREATE TABLE "snodas_geotransform" (
-  "geotransform_id" serial PRIMARY KEY,
   "rast" raster NOT NULL,
-  "valid_dates" daterange NOT NULL
+  "valid_dates" daterange NOT NULL PRIMARY KEY
   -- TODO: constraints on date range no overlaps and is continuous
-)
-
--- reference geotransforms
-INSERT INTO snodas_geotransform VALUES
-  (ST_MakeEmptyRaster(
-     6935,
-     3351,
-     -124.733333333329000,
-     52.874999999997797
-     0.008333333333333,
-     -0.008333333333333
-     0,
-     0,
-     4326,
-   daterange('2013-10-01', NULL, '[)')),
-  (ST_MakeEmptyRaster(
-     6935,
-     3351,
-     -124.733749999998366,
-     52.874583333332339
-     0.008333333333333,
-     -0.008333333333333
-     0,
-     0,
-     4326,
-   daterange(NULL, '2013-10-01', '()'));
-  
+);
 
 -- snodas pixel area table used to calc statistics
 CREATE TABLE "snodas_pixel_geom" (
   "row" integer NOT NULL,
   "col" integer NOT NULL,
   "polygon" geography(Polygon, 4326) NOT NULL,
-  "date_range" daterange NOT NULL,
-  "area_meters" float NOT NULL
-  PRIMARY_KEY(row, col)
-)
+  "valid_dates" daterange NOT NULL references snodas_geotransform ON DELETE CASCADE,
+  "area_meters" float NOT NULL,
+  PRIMARY KEY (row, col, valid_dates)
+);
 
 CREATE TRIGGER snodas_pixel_area_trigger
 BEFORE INSERT OR UPDATE ON snodas_pixel_geom
@@ -518,24 +490,60 @@ FOR EACH ROW EXECUTE PROCEDURE calc_polygon_area();
 
 -- generate all pixel geometries from the
 -- masked snodas raster grid geotransform
--- this is the current grid
-INSERT INTO snodas_pixel_geom
-  SELECT
-    (_g).x,
-    (_g).y,
-    (_g).geom,
-    date_range
-  FROM (
+CREATE OR REPLACE FUNCTION snodas_polygonize_pixels()
+RETURNS TRIGGER
+LANGUAGE plpgsql VOLATILE
+AS $$
+BEGIN
+  DELETE FROM snodas_pixel_geom
+    WHERE valid_dates = NEW.valid_dates;
+  INSERT INTO snodas_pixel_geom
     SELECT
-      date_range,
+      (_g).x,
+      (_g).y,
+      (_g).geom,
+      valid_dates
+    FROM (SELECT
+      NEW.valid_dates,
       ST_PixelAsPolygons(
         ST_AddBand(
-          rast,
+          NEW.rast,
         '8BUI')
       ) as _g
-    FROM snodas_geotransform
-  ) as _h;
+    ) as _h;
+  RETURN NULL;
+END;
+$$;
 
+CREATE TRIGGER snodas_geotransform_polygonize_pixel_trigger
+AFTER INSERT OR UPDATE ON snodas_geotransform
+FOR EACH ROW EXECUTE PROCEDURE snodas_polygonize_pixels();
+
+-- reference geotransforms
+INSERT INTO snodas_geotransform (rast, valid_dates) VALUES
+  (ST_MakeEmptyRaster(
+     6935,
+     3351,
+     -124.733333333329000,
+     52.874999999997797,
+     0.008333333333333,
+     -0.008333333333333,
+     0,
+     0,
+     4326),
+   daterange('2013-10-01', NULL, '[)')),
+  (ST_MakeEmptyRaster(
+     6935,
+     3351,
+     -124.733749999998366,
+     52.874583333332339,
+     0.008333333333333,
+     -0.008333333333333,
+     0,
+     0,
+     4326),
+   daterange(NULL, '2013-10-01', '()'));
+  
 
 -- join table between the pixel area table and the pour point table
 -- used in stat calculations
@@ -543,7 +551,7 @@ CREATE TYPE "snodas_pourpoint_pixel_join" (
   "pourpoint_id" integer NOT NULL REFERENCES "pourpoint" ON DELETE CASCADE,
   "polygon" geography(Polygon, 4326) NOT NULL,
   "intersection_area" float NOT NULL,
-)
+);
 
 
 -- join table between the pixel area table and the pour point table
@@ -555,7 +563,7 @@ CREATE TABLE "pourpoint_rasterized" (
   "area_meters" float NOT NULL,
   PRIMARY KEY (pourpoint_id, valid_dates)
   -- TODO: add raster constraints like snodas table
-)
+);
 
 
 -- table to store daily pourpoint statistics
@@ -573,7 +581,7 @@ CREATE TABLE "pourpoint_snodas_statistics" (
   "precip_liquid" float NOT NULL,        -- kg/m^2
   "temperature" float NOT NULL,          -- kelvin
   PRIMARY KEY (pourpoint_id, date)
-)
+);
 
 
 -- calc stats for a given set of pourpoint pixel
@@ -719,8 +727,7 @@ $$;
 -- new pourpoint with polygon
 CREATE TRIGGER pourpoint_insert_rasterize_and_calc
 AFTER INSERT ON pourpoint
-FOR EACH ROW
-WHEN (NEW.polygon is not NULL)
+FOR EACH ROW WHEN (NEW.polygon is not NULL)
 EXECUTE PROCEDURE pourpoint_rasterize_and_calc();
 
 -- update on pourpoint with new polygon
@@ -733,8 +740,7 @@ FOR EACH ROW WHEN (
 -- new or updated snodas
 CREATE TRIGGER snodas_pourpoint_calc_stats_trigger
 AFTER INSERT OR UPDATE ON snodas
-FOR EACH ROW
-EXECUTE PROCEDURE snodas_pourpoint_calc_stats();
+FOR EACH ROW EXECUTE PROCEDURE snodas_pourpoint_calc_stats();
 
 -- as such need view on stat table
 -- calcs all the things from the base daily stats
