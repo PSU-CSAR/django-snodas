@@ -7,7 +7,7 @@ CREATE SCHEMA pourpoint;
 --  generic
 ---------------
 
-CREATE OR REPLACE FUNCTION snodas.calc_polygon_area()
+CREATE OR REPLACE FUNCTION pourpoint.calc_polygon_area()
 RETURNS TRIGGER
 LANGUAGE plpgsql VOLATILE
 AS $$
@@ -161,7 +161,7 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER snodas.tile_trigger
+CREATE TRIGGER tile_trigger
 AFTER INSERT OR UPDATE ON snodas.raster
 FOR EACH ROW EXECUTE PROCEDURE snodas.tile_raster();
 
@@ -249,13 +249,13 @@ $$;
 --  pourpoints
 ------------------
 
-CREATE TYPE snodas.pourpoint_source AS ENUM ('ref', 'awdb', 'user');
+CREATE TYPE pourpoint.source AS ENUM ('ref', 'awdb', 'user');
 
-CREATE TABLE snodas.pourpoint (
+CREATE TABLE pourpoint.pourpoint (
   "pourpoint_id" serial PRIMARY KEY,
   "name" text NOT NULL,
   "awdb_id" text,
-  "source" snodas.pourpoint_source NOT NULL,
+  "source" pourpoint.source NOT NULL,
   "point" geography(Point, 4326) NOT NULL,
   "polygon" geography(MultiPolygon, 4326),
   "polygon_simple" geometry,
@@ -272,7 +272,7 @@ CREATE TABLE snodas.pourpoint (
   )
 );
 
-CREATE TABLE snodas.pourpoint_tile (
+CREATE TABLE pourpoint.tile (
   "tile" bytea NOT NULL,
   "extent" geometry(POLYGON,3857),
   "x" integer NOT NULL CHECK (x >= 0),
@@ -285,7 +285,7 @@ CREATE TABLE snodas.pourpoint_tile (
 -- this function will dynamically create
 -- a tile when we try to load one,
 -- if one has not already been cached
-CREATE OR REPLACE FUNCTION snodas.get_pourpoint_tile(
+CREATE OR REPLACE FUNCTION pourpoint.get_tile(
   _q_x integer,
   _q_y integer,
   _q_z integer
@@ -300,7 +300,7 @@ BEGIN
   SELECT
     tile
   FROM
-    snodas.pourpoint_tile
+    pourpoint.tile
   WHERE x = _q_x AND y = _q_y AND zoom = _q_z INTO _q_tile;
 
   IF _q_tile IS NULL THEN
@@ -326,7 +326,7 @@ BEGIN
             name,
             source,
             ST_Transform(point, 3857) as geom
-          FROM snodas.pourpoint
+          FROM pourpoint.pourpoint
           WHERE
             -- limit the points to only those that intersect the tile
             ST_Transform(_q_tile_ext, 4326) && point
@@ -361,7 +361,7 @@ BEGIN
                 ),
                 3857
               ) as geom
-            FROM snodas.pourpoint
+            FROM pourpoint.pourpoint
             WHERE
               -- limit the polygons to only those that intersect the tile
               polygon_simple is not Null AND
@@ -371,7 +371,7 @@ BEGIN
     );
       
     -- we save the generated tile for next time
-    INSERT INTO snodas.pourpoint_tile (
+    INSERT INTO pourpoint.tile (
       tile,
       extent,
       x,
@@ -391,7 +391,7 @@ END;
 $$;
 
 
-CREATE OR REPLACE FUNCTION snodas.pourpoint_simplify()
+CREATE OR REPLACE FUNCTION pourpoint.simplify()
 RETURNS TRIGGER
 LANGUAGE plpgsql VOLATILE
 AS $$
@@ -403,13 +403,13 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION snodas.pourpoint_bust_cache()
+CREATE OR REPLACE FUNCTION pourpoint.bust_cache()
 RETURNS TRIGGER
 LANGUAGE plpgsql VOLATILE
 AS $$
 BEGIN
   -- clean out old tiles when pourpoint data changes
-  DELETE FROM snodas.pourpoint_tile WHERE (
+  DELETE FROM pourpoint.tile WHERE (
     extent && OLD.polygon_simple OR
     extent && NEW.polygon_simple OR
     extent && OLD.point OR
@@ -420,45 +420,45 @@ END;
 $$;
 
 -- new pourpoint with polygon and no simplification
-CREATE TRIGGER snodas.pourpoint_insert_simplify_trigger
-BEFORE INSERT ON snodas.pourpoint
+CREATE TRIGGER pourpoint_insert_simplify_trigger
+BEFORE INSERT ON pourpoint.pourpoint
 FOR EACH ROW WHEN (
   NEW.polygon is not NULL AND NEW.polygon_simple is NULL
-) EXECUTE PROCEDURE snodas.pourpoint_simplify();
+) EXECUTE PROCEDURE pourpoint.simplify();
 
-CREATE TRIGGER snodas.pourpoint_insert_area_trigger
-BEFORE INSERT ON snodas.pourpoint
+CREATE TRIGGER pourpoint_insert_area_trigger
+BEFORE INSERT ON pourpoint.pourpoint
 FOR EACH ROW WHEN (NEW.polygon is not NULL)
-EXECUTE PROCEDURE snodas.calc_polygon_area();
+EXECUTE PROCEDURE pourpoint.calc_polygon_area();
 
 -- update on pourpoint with new polygon
 -- and no change to simplified polygon
-CREATE TRIGGER snodas.pourpoint_update_simplify_trigger
-BEFORE UPDATE ON snodas.pourpoint
+CREATE TRIGGER pourpoint_update_simplify_trigger
+BEFORE UPDATE ON pourpoint.pourpoint
 FOR EACH ROW WHEN (
   OLD.polygon IS DISTINCT FROM NEW.polygon AND
   OLD.polygon_simple IS NOT DISTINCT FROM NEW.polygon_simple
-) EXECUTE PROCEDURE snodas.pourpoint_simplify();
+) EXECUTE PROCEDURE pourpoint.simplify();
 
-CREATE TRIGGER snodas.pourpoint_update_area_trigger
-BEFORE UPDATE ON snodas.pourpoint
+CREATE TRIGGER pourpoint_update_area_trigger
+BEFORE UPDATE ON pourpoint.pourpoint
 FOR EACH ROW WHEN (
   OLD.polygon IS DISTINCT FROM NEW.polygon
-) EXECUTE PROCEDURE snodas.calc_polygon_area();
+) EXECUTE PROCEDURE pourpoint.calc_polygon_area();
 
 -- new or deleted pourpoint changes tiles always
-CREATE TRIGGER snodas.pourpoint_bust_cache_trigger
-AFTER INSERT OR DELETE ON snodas.pourpoint
-FOR EACH ROW EXECUTE PROCEDURE snodas.pourpoint_bust_cache();
+CREATE TRIGGER pourpoint_bust_cache_trigger
+AFTER INSERT OR DELETE ON pourpoint.pourpoint
+FOR EACH ROW EXECUTE PROCEDURE pourpoint.bust_cache();
 
 -- updated pourpoint changes tiles when either
 -- the point or simplified polygon are changed
-CREATE TRIGGER snodas.pourpoint_update_bust_cache_trigger
-AFTER UPDATE ON snodas.pourpoint
+CREATE TRIGGER pourpoint_update_bust_cache_trigger
+AFTER UPDATE ON pourpoint.pourpoint
 FOR EACH ROW WHEN (
   OLD.point IS DISTINCT FROM NEW.point OR
   OLD.polygon_simple IS DISTINCT FROM NEW.polygon_simple
-) EXECUTE PROCEDURE snodas.pourpoint_bust_cache();
+) EXECUTE PROCEDURE pourpoint.bust_cache();
 
 
 ------------------
@@ -468,8 +468,8 @@ FOR EACH ROW WHEN (
 -- need the parameters for snodas rasters
 CREATE TABLE snodas.geotransform (
   "rast" raster NOT NULL,
-  "valid_dates" daterange NOT NULL PRIMARY KEY
-  -- TODO: constraints on date range no overlaps and is continuous
+  "valid_dates" daterange NOT NULL PRIMARY KEY,
+  EXCLUDE USING gist (valid_dates WITH &&)
 );
 
 -- reference geotransforms
@@ -501,38 +501,41 @@ INSERT INTO snodas.geotransform (rast, valid_dates) VALUES
 -- stores raster version of pourpoints with pixel values
 -- equal to the pourpoint area in each pixel
 -- used for stat calculations
-CREATE TABLE "snodas.pourpoint_rasterized" (
-  "pourpoint_id" integer NOT NULL REFERENCES snodas.pourpoint ON DELETE CASCADE,
-  "valid_dates" daterange NOT NULL,
+CREATE TABLE pourpoint.rasterized (
+  "rasterized_id" serial PRIMARY KEY,
+  "pourpoint_id" integer NOT NULL REFERENCES pourpoint.pourpoint ON DELETE CASCADE,
+  "valid_dates" daterange NOT NULL REFERENCES snodas.geotransform ON DELETE CASCADE,
   "rast" raster NOT NULL,
   "area_meters" float NOT NULL,
-  PRIMARY KEY (pourpoint_id, valid_dates)
+  UNIQUE (pourpoint_id, valid_dates),
+  EXCLUDE USING gist (valid_dates WITH &&)
   -- TODO: add raster constraints like snodas table
 );
 
 
 -- table to store daily pourpoint statistics
 -- averaged over area of pourpoint polygon
-CREATE TABLE snodas.pourpoint_statistics (
-  "pourpoint_id" integer NOT NULL REFERENCES snodas.pourpoint ON DELETE CASCADE,
-  "date" date NOT NULL REFERENCES "snodas" ON DELETE CASCADE,
+CREATE TABLE pourpoint.statistics (
+  "rasterized_id" integer NOT NULL REFERENCES pourpoint.rasterized ON DELETE CASCADE,
+  "pourpoint_id" integer NOT NULL REFERENCES pourpoint.pourpoint ON DELETE CASCADE,
+  "date" date NOT NULL REFERENCES snodas.raster ON DELETE CASCADE,
   "snowcover" float NOT NULL,            -- percent
   "depth" float NOT NULL,                -- meters
   "swe" float NOT NULL,                  -- meters
   "runoff" float NOT NULL,               -- meters
-  "submlimation" float NOT NULL,         -- meters
+  "sublimation" float NOT NULL,         -- meters
   "sublimation_blowing" float NOT NULL,  -- meters
   "precip_solid" float NOT NULL,         -- kg/m^2
   "precip_liquid" float NOT NULL,        -- kg/m^2
-  "temperature" float NOT NULL,          -- kelvin
+  "average_temp" float NOT NULL,          -- kelvin
   PRIMARY KEY (pourpoint_id, date)
 );
 
 
 -- calc stats for a given pourpoint raster
 -- and a snodas raster
-CREATE OR REPLACE FUNCTION snodas.pourpoint_calc_stats(
-  p snodas.pourpoint_rasterized,
+CREATE OR REPLACE FUNCTION pourpoint.calc_stats(
+  p pourpoint.rasterized,
   s snodas.raster
 )
 RETURNS void
@@ -546,7 +549,21 @@ BEGIN
       USING HINT = 'Make sure you call pourpoint_calc_stats with a valid pourpoint raster for the SNODAS date.';
   END IF;
 
-  INSERT INTO snodas.pourpoint_statistics VALUES (
+  INSERT INTO pourpoint.statistics (
+      rasterized_id,
+      pourpoint_id,
+      date,
+      snowcover,
+      depth,
+      swe,
+      runoff,
+      sublimation,
+      sublimation_blowing,
+      precip_solid,
+      precip_liquid,
+      average_temp
+  ) VALUES (
+    p.rasterized_id,
     p.pourpoint_id,
     s.date,
     -- snowcover:
@@ -589,7 +606,7 @@ BEGIN
     -- divided by the total pourpoint area to find average
     -- scale factor 10
     (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_liquid, '[rast1.val] * [rast2.val]/10', '64BF', 'FIRST'))).sum / p.area_meters,
-    -- temperature:
+    -- average_temp:
     -- temperature in kelvin times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
     -- scale factor 1
@@ -600,16 +617,14 @@ $$;
 
 -- trigger on insert/update of pourpoint geom
 -- to make pixel join table entries with areas
-CREATE OR REPLACE FUNCTION snodas.pourpoint_rasterize_and_calc()
+CREATE OR REPLACE FUNCTION pourpoint.rasterize_and_calc()
 RETURNS TRIGGER
 LANGUAGE plpgsql VOLATILE
 AS $$
 BEGIN
   -- if update delete existing rasterization
-  DELETE FROM snodas.pourpoint_rasterized
-    WHERE pourpoint_id = NEW.pourpoint_id;
-  -- and also any statistics
-  DELETE FROM snodas.pourpoint_statistics
+  -- cascade will also delete any statistics
+  DELETE FROM pourpoint.rasterized
     WHERE pourpoint_id = NEW.pourpoint_id;
 
   -- create a new rasterization
@@ -636,8 +651,12 @@ BEGIN
       FROM snodas.geotransform
     ) as _h
   )
-  INSERT INTO snodas.pourpoint_rasterized
-    SELECT
+  INSERT INTO pourpoint.rasterized (
+    pourpoint_id,
+    valid_dates,
+    rast,
+    area_meters
+  ) SELECT
       NEW.pourpoint_id,
       spg.valid_dates,
       ST_Union(ST_AsRaster(
@@ -654,10 +673,9 @@ BEGIN
     FROM spg
     GROUP BY valid_dates;
 
-  -- calc the pourpoint stats for all
-  -- snodas dates
-  PERFORM snodas.pourpoint_calc_stats((p), (s))
-    FROM snodas.pourpoint_rasterized as p, snodas.raster as s
+  -- calc the pourpoint stats for all snodas dates
+  PERFORM pourpoint.calc_stats((p), (s))
+    FROM pourpoint.rasterized as p, snodas.raster as s
     WHERE
       NEW.pourpoint_id = p.pourpoint_id AND
       p.valid_dates @> s.date;
@@ -668,19 +686,19 @@ $$;
 
 -- trigger on insert/update of snodas rasters
 -- to calc stats for all pourpoint polygons
-CREATE OR REPLACE FUNCTION snodas.raster_calc_stats()
+CREATE OR REPLACE FUNCTION pourpoint.snodas_calc_stats()
 RETURNS TRIGGER
 LANGUAGE plpgsql VOLATILE
 AS $$
 BEGIN
   -- in case update try to delete any statistics for date
-  DELETE FROM snodas.pourpoint_statistics as p
+  DELETE FROM pourpoint.statistics as p
     WHERE p.date = NEW.date;
 
   -- calc the pourpoint stats for all
   -- pourpoints with this snodas data
-  PERFORM snodas.pourpoint_calc_stats((p), NEW)
-    FROM snodas.pourpoint_rasterized as p
+  PERFORM pourpoint.calc_stats((p), NEW)
+    FROM pourpoint.rasterized as p
     WHERE
       p.valid_dates @> NEW.date;
   
@@ -689,22 +707,22 @@ END;
 $$;
 
 -- new pourpoint with polygon
-CREATE TRIGGER snodas.pourpoint_insert_rasterize_and_calc
-AFTER INSERT ON snodas.pourpoint
+CREATE TRIGGER pourpoint_insert_rasterize_and_calc
+AFTER INSERT ON pourpoint.pourpoint
 FOR EACH ROW WHEN (NEW.polygon is not NULL)
-EXECUTE PROCEDURE snodas.pourpoint_rasterize_and_calc();
+EXECUTE PROCEDURE pourpoint.rasterize_and_calc();
 
 -- update on pourpoint with new polygon
-CREATE TRIGGER snodas.pourpoint_update_rasterize_and_calc
-AFTER UPDATE ON snodas.pourpoint
+CREATE TRIGGER pourpoint_update_rasterize_and_calc
+AFTER UPDATE ON pourpoint.pourpoint
 FOR EACH ROW WHEN (
   OLD.polygon IS DISTINCT FROM NEW.polygon
-) EXECUTE PROCEDURE snodas.pourpoint_rasterize_and_calc();
+) EXECUTE PROCEDURE pourpoint.rasterize_and_calc();
 
 -- new or updated snodas
-CREATE TRIGGER snodas.raster_calc_stats_trigger
+CREATE TRIGGER raster_calc_stats_trigger
 AFTER INSERT OR UPDATE ON snodas.raster
-FOR EACH ROW EXECUTE PROCEDURE snodas.raster_calc_stats();
+FOR EACH ROW EXECUTE PROCEDURE pourpoint.snodas_calc_stats();
 
 -- as such need view on stat table
 -- calcs all the things from the base daily stats

@@ -1,5 +1,8 @@
 from __future__ import absolute_import, print_function
 
+import os
+import sys
+
 from getpass import getpass
 
 from psycopg2 import connect, ProgrammingError
@@ -15,7 +18,7 @@ from . import dropdb
 
 
 class Command(BaseCommand):
-    help = """Creates a postgresql database for snodas using the
+    help = """Creates a postgresql database for using the
     settings defined for the current instance of the project."""
 
     requires_system_checks = False
@@ -37,24 +40,6 @@ class Command(BaseCommand):
                  'Default is to prompt user for input.',
         )
         parser.add_argument(
-            '--create-superuser',
-            action='store_false',
-            help='Make the created DB user a superuser. '
-                 'Default is false, unless ENV is development.',
-        )
-        parser.add_argument(
-            '--template',
-            default='postgis_21',
-            help='An existing database template to use. '
-                 'Default is "postgis_21".',
-        )
-        parser.add_argument(
-            '--tablespace',
-            default='gis_data',
-            help='An existing tablespace to use. '
-                 'Default is "gis_data"',
-        )
-        parser.add_argument(
             '-R',
             '--router',
             action='store',
@@ -69,6 +54,12 @@ class Command(BaseCommand):
             default=False,
             help='If given, the database will be dropped before creation.',
         )
+        parser.add_argument(
+            '-o',
+            '--owner',
+            default='app',
+            help='The database owner username.'
+        )
 
     def handle(self, *args, **options):
         router = options.get('router')
@@ -76,6 +67,7 @@ class Command(BaseCommand):
         if dbinfo is None:
             raise CommandError("Unknown database router %s" % router)
 
+        owner = options.get('owner')
         createuser = options.get('admin_user')
         createpass = get_default(
             options,
@@ -90,34 +82,52 @@ class Command(BaseCommand):
         dbport = get_default(dbinfo, 'PORT', 5432)
 
         if options.get('drop', None):
-            management.call_command(dropdb.Command(router=router))
+            management.call_command(
+                dropdb.Command(),
+                router=router,
+                admin_user=createuser,
+                admin_pass=createpass,
+            )
 
-        con = None
-        con = connect(dbname='postgres',
-                      user=createuser,
-                      password=createpass,
-                      host=dbhost,
-                      port=dbport)
+        with connect(
+            dbname='postgres',
+            user=createuser,
+            password=createpass,
+            host=dbhost,
+            port=dbport,
+        ) as connection:
+            connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            with connection.cursor() as cursor:
+                # create the owner role for consistent object ownership
+                try:
+                    cursor.execute("CREATE ROLE {}".format(owner))
+                except ProgrammingError:
+                    # app user already exists
+                    pass
 
-        con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-        cur = con.cursor()
+                # create the login user
+                try:
+                    cursor.execute(
+                        "CREATE ROLE {} LOGIN WITH ENCRYPTED PASSWORD '{}' IN ROLE {}".format(
+                            dbuser,
+                            dbpass,
+                            owner,
+                        ),
+                    )
+                except ProgrammingError:
+                    # login user already exsits
+                    pass
 
-        try:
-            cur.execute("CREATE USER {} WITH ENCRYPTED PASSWORD '{}' CREATEDB;".format(dbuser, dbpass))
-        except ProgrammingError:
-            pass
-        else:
-            if options.get('create_superuser') or \
-                    settings.ENV == 'development':
-                cur.execute('ALTER ROLE {} SUPERUSER'.format(dbuser))
-
-        cur.execute('CREATE DATABASE {} WITH ENCODING \'UTF-8\' OWNER {} TEMPLATE {} TABLESPACE {};'.format(dbname, dbuser, options['template'], options['tablespace']))
-        cur.execute('GRANT ALL PRIVILEGES ON DATABASE {} TO {};'.format(dbname, dbuser))
-        cur.close()
-        con.close()
+                # create the database
+                cursor.execute(
+                    'CREATE DATABASE {} WITH ENCODING \'UTF-8\' OWNER {}'.format(
+                        dbname,
+                        owner,
+                    ),
+                )
 
         print((
             '\nDatabase {} created. '
             'Be sure to run the data migrations:\n\n'
-            '`snodas migrate [options]`'
-        ).format(settings.INSTANCE_NAME))
+            '`{} migrate [options]`'
+        ).format(settings.INSTANCE_NAME, os.path.basename(sys.argv[0])))

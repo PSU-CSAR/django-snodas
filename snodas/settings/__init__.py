@@ -28,7 +28,7 @@ DEBUG = conf_settings.get('DEBUG', False)
 # first pull in the base settings
 settings_files = [
     'base.py',
-    'caching.py',
+#    'caching.py',
     'database.py',
     'logging.py',
     'cors.py',

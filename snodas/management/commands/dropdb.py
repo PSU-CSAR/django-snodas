@@ -93,24 +93,22 @@ class Command(BaseCommand):
             confirm = 'yes'
 
         if confirm != 'yes':
-            print('Reset cancelled.')
+            print('Drop cancelled.')
             return
 
+        # need to make sure we're not connected to the DB?
         connection.close()
 
-        con = None
-        con = connect(dbname='postgres',
-                      user=dbuser,
-                      password=dbpass,
-                      host=dbhost,
-                      port=dbport)
+        with connect(
+            dbname='postgres',
+            user=dbuser,
+            password=dbpass,
+            host=dbhost,
+            port=dbport,
+        ) as conn:
+            conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            cursor = conn.cursor()
+            cursor.execute('DROP DATABASE IF EXISTS {}'.format(dbname))
 
-        con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-        cur = con.cursor()
-        cur.execute('DROP DATABASE IF EXISTS {};'.format(dbname))
-
-        if options.get('drop_user'):
-            cur.execute('DROP USER IF EXISTS {};'.format(dbinfo.get('USER')))
-
-        cur.close()
-        con.close()
+            if options.get('drop_user'):
+                cursor.execute('DROP USER IF EXISTS {}'.format(dbinfo.get('USER')))

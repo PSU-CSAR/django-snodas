@@ -11,6 +11,9 @@ DATABASES = {
         'PASSWORD': DATABASE_PASSWORD,
         'HOST': DATABASE_HOST,
         'PORT': DATABASE_PORT,
+        'INIT_COMMANDS': [
+            'SET ROLE app',
+        ],
     }
 }
 
