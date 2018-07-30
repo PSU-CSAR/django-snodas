@@ -570,7 +570,7 @@ BEGIN
     -- sum the area values where data in both rasters
     -- and divide by the total area
     -- multiplied by 100 to get percent
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast2.val]', '64BF', 'FIRST'))).sum / p.area_meters * 100,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast1.val]', '64BF', 'FIRST'))).sum / p.area_meters * 100,
     -- depth:
     -- depth in meters times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
