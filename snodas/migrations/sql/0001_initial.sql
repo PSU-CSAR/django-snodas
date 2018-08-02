@@ -365,7 +365,7 @@ BEGIN
             WHERE
               -- limit the polygons to only those that intersect the tile
               polygon_simple is not Null AND
-              ST_Transform(_q_tile_ext, 4326) && polygon_simple
+              ST_Intersects(ST_Transform(_q_tile_ext, 4326), polygon_simple)
           ) as poly
       ) AS polygons)
     );
@@ -410,10 +410,10 @@ AS $$
 BEGIN
   -- clean out old tiles when pourpoint data changes
   DELETE FROM pourpoint.tile WHERE (
-    extent && OLD.polygon_simple OR
-    extent && NEW.polygon_simple OR
-    extent && OLD.point OR
-    extent && NEW.point
+    ST_Intersects(extent, OLD.polygon_simple) OR
+    ST_Intersects(extent, NEW.polygon_simple) OR
+    ST_Intersects(extent, OLD.point) OR
+    ST_Intersects(extent, NEW.point)
   );
   RETURN NULL;
 END;
@@ -615,6 +615,126 @@ BEGIN
 END;
 $$;
 
+
+-- rasterize a pourpoint to snodas grid
+-- this method is less accurate, but much faster
+-- simply considers average of all snodas grid
+-- centriods within the pourpoint area equally
+CREATE OR REPLACE FUNCTION pourpoint.rasterize_1(
+  _q_p pourpoint.pourpoint,
+  _q_s snodas.geotransform
+)
+RETURNS pourpoint.rasterized
+LANGUAGE plpgsql IMMUTABLE
+AS $$
+BEGIN
+  RETURN (SELECT 
+
+
+  WITH spg as (
+    SELECT
+      (_g).geom as geom,
+      (_g).geom::geography as geog,
+      valid_dates
+    FROM (
+      SELECT
+        valid_dates,
+        ST_PixelAsPolygons(
+          ST_Clip(
+            ST_AddBand(
+              rast,
+              '1BB'
+            ),
+            _q_p.polygon::geometry
+          )
+        ) as _g
+    ) as _h
+  )
+  SELECT INTO _q_r (
+    pourpoint_id,
+    valid_dates,
+    rast,
+    area_meters
+  ) SELECT
+      _q_p.pourpoint_id,
+      spg.valid_dates,
+      ST_Union(ST_AsRaster(
+        spg.geom,
+        (select rast from snodas.geotransform as sgt where sgt.valid_dates = spg.valid_dates),
+        '64BF',
+        CASE
+          WHEN ST_Covers(NEW.polygon, spg.geog) THEN ST_Area(spg.geog)
+          ELSE ST_Area(ST_Intersection(_q_p.polygon, spg.geog))
+        END,
+        -9999
+      )),
+      _q_p.area_meters
+    FROM spg
+    GROUP BY valid_dates;
+  RETURN _q_r;
+END;
+$$;
+
+-- rasterize pourpoint to snodas grid
+-- this method is "more accurate" (though has
+-- loss of precision due to rounding errors)
+-- we intersect pourpoint polygon with the
+-- snodas pixel geoms and rasterize them
+-- with the value of the intersected area
+CREATE OR REPLACE FUNCTION pourpoint.rasterize_2(
+  _q_p pourpoint.pourpoint,
+  _q_s snodas.geotransform
+)
+RETURNS TRIGGER
+LANGUAGE plpgsql IMMUTABLE
+AS $$
+DECLARE
+  _q_r pourpoint.rasterized;
+BEGIN
+  WITH spg as (
+    SELECT
+      (_g).geom as geom,
+      (_g).geom::geography as geog,
+      valid_dates
+    FROM (
+      SELECT
+        valid_dates,
+        ST_PixelAsPolygons(
+          ST_Clip(
+            ST_AddBand(
+              rast,
+              '1BB'
+            ),
+            _q_p.polygon::geometry
+          )
+        ) as _g
+    ) as _h
+  )
+  SELECT INTO _q_r (
+    pourpoint_id,
+    valid_dates,
+    rast,
+    area_meters
+  ) SELECT
+      _q_p.pourpoint_id,
+      spg.valid_dates,
+      ST_Union(ST_AsRaster(
+        spg.geom,
+        (select rast from snodas.geotransform as sgt where sgt.valid_dates = spg.valid_dates),
+        '64BF',
+        CASE
+          WHEN ST_Covers(NEW.polygon, spg.geog) THEN ST_Area(spg.geog)
+          ELSE ST_Area(ST_Intersection(_q_p.polygon, spg.geog))
+        END,
+        -9999
+      )),
+      _q_p.area_meters
+    FROM spg
+    GROUP BY valid_dates;
+  RETURN _q_r;
+END;
+$$;
+
 -- trigger on insert/update of pourpoint geom
 -- to make pixel join table entries with areas
 CREATE OR REPLACE FUNCTION pourpoint.rasterize_and_calc()
@@ -628,9 +748,6 @@ BEGIN
     WHERE pourpoint_id = NEW.pourpoint_id;
 
   -- create a new rasterization
-  -- we intersect pourpoint polygon with the
-  -- snodas pixel geoms and rasterize them
-  -- with the value of the intersected area
   WITH spg as (
     SELECT
       (_g).geom as geom,
