@@ -4,8 +4,8 @@ from datetime import datetime
 
 from django.db import connection
 
-POLY_PIXEL_X = 10
-POLY_PIXEL_Y = 10
+POLY_PIXEL_X = 100
+POLY_PIXEL_Y = 100
 GEOTRANSFORM = {
     'origin_x': -124.733333333329000,
     'origin_y': 52.874999999997797,
@@ -95,6 +95,7 @@ stats_sql = '''SELECT
 class ConstantSNODASTestCase(TestCase):
     def setUp(self):
         with connection.cursor() as cursor:
+	    cursor.execute(pourpoint_sql)
             cursor.execute(raster_sql)
             raster_data = cursor.fetchone()[0]
             for day in range(1, 3):
@@ -102,7 +103,6 @@ class ConstantSNODASTestCase(TestCase):
                     snodas_sql,
                     [raster_data]*8 + [datetime.strptime('201805{0:02d}'.format(day), '%Y%m%d')],
                 )
-	    cursor.execute(pourpoint_sql)
 
 
     def test_check_stats(self):
