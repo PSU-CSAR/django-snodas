@@ -138,7 +138,7 @@ class Command(BaseCommand):
 
         date = validate_raster_dates(rasters)
 
-        sql = '''INSERT INTO snodas (
+        sql = '''INSERT INTO snodas.raster (
     swe,
     depth,
     runoff,

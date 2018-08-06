@@ -12,7 +12,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql VOLATILE
 AS $$
 BEGIN
-  NEW.area_meters = ST_Area(NEW.polygon);
+  NEW.area_meters = ST_Area(NEW.polygon::geography);
   RETURN NEW;
 END;
 $$;
@@ -99,7 +99,7 @@ CREATE TABLE snodas.raster (
 );
 
 
-CREATE TABLE snodas.raster_tiles (
+CREATE TABLE snodas.tiles (
   "date" date NOT NULL REFERENCES snodas.raster ON DELETE CASCADE,
   "rast" raster,
   "x" integer NOT NULL CHECK (x >= 0),
@@ -114,25 +114,24 @@ CREATE TABLE snodas.raster_tiles (
 );
 
 
-CREATE OR REPLACE FUNCTION snodas.tile_raster()
-RETURNS TRIGGER
-LANGUAGE plpgsql VOLATILE
+CREATE OR REPLACE FUNCTION snodas.reclass_and_warp(
+  _r raster
+)
+RETURNS raster
+LANGUAGE plpgsql IMMUTABLE STRICT
 AS $$
 DECLARE
-  warped raster;
   stats summarystats;
   lower double precision;
   upper double precision;
 BEGIN
-  -- clean out old tiles so we can rebuild
-  DELETE FROM snodas.raster_tiles WHERE date = NEW.date;
-  
-  -- do a 2.5 std dev stretch on the imagery
-  stats := ST_SummaryStats(NEW.swe);
+  -- do a 2.5 std dev stretch and reproject
+  -- the raster to the output crs
+  stats := ST_SummaryStats(_r);
   lower := GREATEST(0, stats.mean - 2.5 * stats.stddev);
   upper := LEAST(32767, stats.mean + 2.5 * stats.stddev);
-  warped := ST_Reclass(
-    NEW.swe,
+  RETURN (SELECT ST_Transform(ST_Reclass(
+    _r,
     1,
     '-32768-0):0, [0-' ||
       lower ||
@@ -145,25 +144,40 @@ BEGIN
       '-32767:255'::text,
     '8BUI'::text,
     0::double precision
-  );
+  ), 3857));
+END;
+$$;
+
+
+CREATE OR REPLACE FUNCTION snodas.make_tiles()
+RETURNS TRIGGER
+LANGUAGE plpgsql VOLATILE
+AS $$
+DECLARE
+BEGIN
+  -- clean out old tiles so we can rebuild
+  DELETE FROM snodas.tiles WHERE date = NEW.date;
   
-  -- reproject the raster to the output crs
-  warped := ST_Transform(warped, 3857);
-      
-  -- generate the tiles inserting each into the tile table
-  -- we override the defaults and generate zoom levels 0 through 7
-  INSERT INTO snodas.raster_tiles
+  -- create the tiles
+  INSERT INTO snodas.tiles
     (date, rast, x, y, zoom)
   SELECT
     NEW.date, t.rast, t.x, t.y, t.z
-  FROM tms_build_tiles(warped, 0, 7) AS t;
+  FROM
+    generate_series(0, 7) as zoom,
+  LATERAL
+    tms_tile_raster_to_zoom(
+      snodas.reclass_and_warp(NEW.swe),
+      zoom
+  ) AS t;
+
   RETURN NULL;
 END;
 $$;
 
 CREATE TRIGGER tile_trigger
 AFTER INSERT OR UPDATE ON snodas.raster
-FOR EACH ROW EXECUTE PROCEDURE snodas.tile_raster();
+FOR EACH ROW EXECUTE PROCEDURE snodas.make_tiles();
 
 
 -- this function will dynamically create a
@@ -257,7 +271,7 @@ CREATE TABLE pourpoint.pourpoint (
   "awdb_id" text,
   "source" pourpoint.source NOT NULL,
   "point" geography(Point, 4326) NOT NULL,
-  "polygon" geography(MultiPolygon, 4326),
+  "polygon" geometry,
   "polygon_simple" geometry,
   "area_meters" float,
   CONSTRAINT polygon_simple_required CHECK (
@@ -398,7 +412,7 @@ AS $$
 BEGIN
   -- simplify then transform (less points for the transform)
   NEW.polygon_simple =
-    ST_Transform(ST_SimplifyPreserveTopology(NEW.polygon::geometry, .001), 3857);
+    ST_Transform(ST_SimplifyPreserveTopology(NEW.polygon, .001), 3857);
   RETURN NEW;
 END;
 $$;
@@ -534,7 +548,84 @@ CREATE TABLE pourpoint.statistics (
 
 -- calc stats for a given pourpoint raster
 -- and a snodas raster
-CREATE OR REPLACE FUNCTION pourpoint.calc_stats(
+-- only to be used with pourpoint.rasterize_1
+CREATE OR REPLACE FUNCTION pourpoint.calc_stats_1(
+  p pourpoint.rasterized,
+  s snodas.raster
+)
+RETURNS void
+LANGUAGE plpgsql VOLATILE
+AS $$
+BEGIN
+  IF NOT p.valid_dates @> s.date THEN
+    RAISE EXCEPTION 'SNODAS date not within pourpoint raster valid dates: % not in %',
+        s.date,
+        p.valid_dates
+      USING HINT = 'Make sure you call pourpoint_calc_stats with a valid pourpoint raster for the SNODAS date.';
+  END IF;
+
+  INSERT INTO pourpoint.statistics (
+      rasterized_id,
+      pourpoint_id,
+      date,
+      snowcover,
+      depth,
+      swe,
+      runoff,
+      sublimation,
+      sublimation_blowing,
+      precip_solid,
+      precip_liquid,
+      average_temp
+  ) VALUES (
+    p.rasterized_id,
+    p.pourpoint_id,
+    s.date,
+    -- percent snowcover:
+    -- number of cells with data in both rasters
+    -- divided by the total number of cells in the
+    -- pourpoint raster multiplied by 100
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast1.val]', '64BF', 'FIRST'))).count / (ST_SummaryStats(p.rast)).count * 100,
+    -- snow depth (meters):
+    -- average of all cells with data in both rasters
+    -- scale factor 1000
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.depth, '[rast2.val]/1000', '64BF', 'FIRST'))).mean,
+    -- swe (meters):
+    -- average of all cells with data in both rasters
+    -- scale factor 1000
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast2.val]/1000', '64BF', 'FIRST'))).mean,
+    -- runoff (meters):
+    -- average of all cells with data in both rasters
+    -- scale factor 100000
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.runoff, '[rast2.val]/100000', '64BF', 'FIRST'))).mean,
+    -- sublimation (meters):
+    -- average of all cells with data in both rasters
+    -- scale factor 100000
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation, '[rast2.val]/100000', '64BF', 'FIRST'))).mean,
+    -- sublimation_blowing (meters):
+    -- average of all cells with data in both rasters
+    -- scale factor 100000
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation_blowing, '[rast2.val]/100000', '64BF', 'FIRST'))).mean,
+    -- precip_solid (meters):
+    -- average of all cells with data in both rasters
+    -- scale factor 10
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_solid, '[rast2.val]/10', '64BF', 'FIRST'))).mean,
+    -- precip_liquid (meters):
+    -- average of all cells with data in both rasters
+    -- scale factor 10
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_liquid, '[rast2.val]/10', '64BF', 'FIRST'))).mean,
+    -- average_temp (kelvin):
+    -- average of all cells with data in both rasters
+    -- scale factor 1
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.average_temp, '[rast2.val]', '64BF', 'FIRST'))).mean
+  );
+END;
+$$;
+
+-- calc stats for a given pourpoint raster
+-- and a snodas raster
+-- only to be used with pourpoint.rasterize_2
+CREATE OR REPLACE FUNCTION pourpoint.calc_stats_2(
   p pourpoint.rasterized,
   s snodas.raster
 )
@@ -618,60 +709,18 @@ $$;
 
 -- rasterize a pourpoint to snodas grid
 -- this method is less accurate, but much faster
--- simply considers average of all snodas grid
--- centriods within the pourpoint area equally
+-- stats with this simply consider average of all
+-- snodas grid centriods within the pourpoint area
+-- with equal weight
 CREATE OR REPLACE FUNCTION pourpoint.rasterize_1(
   _q_p pourpoint.pourpoint,
   _q_s snodas.geotransform
 )
-RETURNS pourpoint.rasterized
+RETURNS raster
 LANGUAGE plpgsql IMMUTABLE
 AS $$
 BEGIN
-  RETURN (SELECT 
-
-
-  WITH spg as (
-    SELECT
-      (_g).geom as geom,
-      (_g).geom::geography as geog,
-      valid_dates
-    FROM (
-      SELECT
-        valid_dates,
-        ST_PixelAsPolygons(
-          ST_Clip(
-            ST_AddBand(
-              rast,
-              '1BB'
-            ),
-            _q_p.polygon::geometry
-          )
-        ) as _g
-    ) as _h
-  )
-  SELECT INTO _q_r (
-    pourpoint_id,
-    valid_dates,
-    rast,
-    area_meters
-  ) SELECT
-      _q_p.pourpoint_id,
-      spg.valid_dates,
-      ST_Union(ST_AsRaster(
-        spg.geom,
-        (select rast from snodas.geotransform as sgt where sgt.valid_dates = spg.valid_dates),
-        '64BF',
-        CASE
-          WHEN ST_Covers(NEW.polygon, spg.geog) THEN ST_Area(spg.geog)
-          ELSE ST_Area(ST_Intersection(_q_p.polygon, spg.geog))
-        END,
-        -9999
-      )),
-      _q_p.area_meters
-    FROM spg
-    GROUP BY valid_dates;
-  RETURN _q_r;
+  RETURN (SELECT ST_AsRaster(_q_p.polygon, _q_s.rast, '1BB'::text));
 END;
 $$;
 
@@ -685,52 +734,36 @@ CREATE OR REPLACE FUNCTION pourpoint.rasterize_2(
   _q_p pourpoint.pourpoint,
   _q_s snodas.geotransform
 )
-RETURNS TRIGGER
+RETURNS raster
 LANGUAGE plpgsql IMMUTABLE
 AS $$
 DECLARE
-  _q_r pourpoint.rasterized;
+  _q_r raster;
 BEGIN
   WITH spg as (
     SELECT
       (_g).geom as geom,
-      (_g).geom::geography as geog,
-      valid_dates
+      (_g).geom::geography as geog
     FROM (
       SELECT
-        valid_dates,
         ST_PixelAsPolygons(
-          ST_Clip(
-            ST_AddBand(
-              rast,
-              '1BB'
-            ),
-            _q_p.polygon::geometry
-          )
+          ST_AsRaster(_q_p.polygon, _q_s.rast, '1BB'::text)
         ) as _g
     ) as _h
   )
-  SELECT INTO _q_r (
-    pourpoint_id,
-    valid_dates,
-    rast,
-    area_meters
-  ) SELECT
-      _q_p.pourpoint_id,
-      spg.valid_dates,
-      ST_Union(ST_AsRaster(
-        spg.geom,
-        (select rast from snodas.geotransform as sgt where sgt.valid_dates = spg.valid_dates),
-        '64BF',
-        CASE
-          WHEN ST_Covers(NEW.polygon, spg.geog) THEN ST_Area(spg.geog)
-          ELSE ST_Area(ST_Intersection(_q_p.polygon, spg.geog))
-        END,
-        -9999
-      )),
-      _q_p.area_meters
-    FROM spg
-    GROUP BY valid_dates;
+  SELECT INTO _q_r
+    ST_Union(ST_AsRaster(
+      spg.geom,
+      _q_s.rast,
+      '64BF',
+      CASE
+        WHEN ST_Covers(_q_p.polygon, spg.geom) THEN ST_Area(spg.geog)
+        ELSE ST_Area(ST_Intersection(_q_p.polygon::geography, spg.geog))
+      END,
+      -9999
+    )),
+    _q_p.area_meters
+  FROM spg;
   RETURN _q_r;
 END;
 $$;
@@ -748,26 +781,6 @@ BEGIN
     WHERE pourpoint_id = NEW.pourpoint_id;
 
   -- create a new rasterization
-  WITH spg as (
-    SELECT
-      (_g).geom as geom,
-      (_g).geom::geography as geog,
-      valid_dates
-    FROM (
-      SELECT
-        valid_dates,
-        ST_PixelAsPolygons(
-          ST_Clip(
-            ST_AddBand(
-              rast,
-              '1BB'
-            ),
-            NEW.polygon::geometry
-          )
-        ) as _g
-      FROM snodas.geotransform
-    ) as _h
-  )
   INSERT INTO pourpoint.rasterized (
     pourpoint_id,
     valid_dates,
@@ -775,23 +788,13 @@ BEGIN
     area_meters
   ) SELECT
       NEW.pourpoint_id,
-      spg.valid_dates,
-      ST_Union(ST_AsRaster(
-        spg.geom,
-        (select rast from snodas.geotransform as sgt where sgt.valid_dates = spg.valid_dates),
-        '64BF',
-        CASE
-          WHEN ST_Covers(NEW.polygon, spg.geog) THEN ST_Area(spg.geog)
-          ELSE ST_Area(ST_Intersection(NEW.polygon, spg.geog))
-        END,
-        -9999
-      )),
+      s.valid_dates,
+      pourpoint.rasterize_1((NEW), (s)),
       NEW.area_meters
-    FROM spg
-    GROUP BY valid_dates;
+    FROM snodas.geotransform as s;
 
   -- calc the pourpoint stats for all snodas dates
-  PERFORM pourpoint.calc_stats((p), (s))
+  PERFORM pourpoint.calc_stats_1((p), (s))
     FROM pourpoint.rasterized as p, snodas.raster as s
     WHERE
       NEW.pourpoint_id = p.pourpoint_id AND
@@ -814,7 +817,7 @@ BEGIN
 
   -- calc the pourpoint stats for all
   -- pourpoints with this snodas data
-  PERFORM pourpoint.calc_stats((p), NEW)
+  PERFORM pourpoint.calc_stats_1((p), NEW)
     FROM pourpoint.rasterized as p
     WHERE
       p.valid_dates @> NEW.date;
