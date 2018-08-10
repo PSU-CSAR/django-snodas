@@ -118,7 +118,7 @@ CREATE OR REPLACE FUNCTION snodas.reclass_and_warp(
   _r raster
 )
 RETURNS raster
-LANGUAGE plpgsql IMMUTABLE STRICT
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
 AS $$
 DECLARE
   stats summarystats;
@@ -494,7 +494,7 @@ INSERT INTO snodas.geotransform (rast, valid_dates) VALUES
      -124.733333333329000,
      52.874999999997797,
      0.008333333333333,
-     -0.008333333333333,
+     0.008333333333333,
      0,
      0,
      4326),
@@ -505,7 +505,7 @@ INSERT INTO snodas.geotransform (rast, valid_dates) VALUES
      -124.733749999998366,
      52.874583333332339,
      0.008333333333333,
-     -0.008333333333333,
+     0.008333333333333,
      0,
      0,
      4326),
@@ -585,39 +585,39 @@ BEGIN
     -- number of cells with data in both rasters
     -- divided by the total number of cells in the
     -- pourpoint raster multiplied by 100
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast1.val]', '64BF', 'FIRST'))).count / (ST_SummaryStats(p.rast)).count * 100,
+    ST_Count(ST_MapAlgebra(p.rast, s.swe, '[rast1]', NULL, 'FIRST'))::float / ST_Count(p.rast) * 100,
     -- snow depth (meters):
     -- average of all cells with data in both rasters
     -- scale factor 1000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.depth, '[rast2.val]/1000', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.depth, '[rast2]/1000', '64BF', 'FIRST'))).mean,
     -- swe (meters):
     -- average of all cells with data in both rasters
     -- scale factor 1000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast2.val]/1000', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast2]/1000', '64BF', 'FIRST'))).mean,
     -- runoff (meters):
     -- average of all cells with data in both rasters
     -- scale factor 100000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.runoff, '[rast2.val]/100000', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.runoff, '[rast2]/100000', '64BF', 'FIRST'))).mean,
     -- sublimation (meters):
     -- average of all cells with data in both rasters
     -- scale factor 100000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation, '[rast2.val]/100000', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation, '[rast2]/100000', '64BF', 'FIRST'))).mean,
     -- sublimation_blowing (meters):
     -- average of all cells with data in both rasters
     -- scale factor 100000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation_blowing, '[rast2.val]/100000', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation_blowing, '[rast2]/100000', '64BF', 'FIRST'))).mean,
     -- precip_solid (meters):
     -- average of all cells with data in both rasters
     -- scale factor 10
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_solid, '[rast2.val]/10', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_solid, '[rast2]/10', '64BF', 'FIRST'))).mean,
     -- precip_liquid (meters):
     -- average of all cells with data in both rasters
     -- scale factor 10
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_liquid, '[rast2.val]/10', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_liquid, '[rast2]/10', '64BF', 'FIRST'))).mean,
     -- average_temp (kelvin):
     -- average of all cells with data in both rasters
     -- scale factor 1
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.average_temp, '[rast2.val]', '64BF', 'FIRST'))).mean
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.average_temp, '[rast2]', '64BF', 'FIRST'))).mean
   );
 END;
 $$;
@@ -661,47 +661,47 @@ BEGIN
     -- sum the area values where data in both rasters
     -- and divide by the total area
     -- multiplied by 100 to get percent
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast1.val]', '64BF', 'FIRST'))).sum / p.area_meters * 100,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast1]', '64BF', 'FIRST'))).sum / p.area_meters * 100,
     -- depth:
     -- depth in meters times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
     -- scale factor 1000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.depth, '[rast1.val] * [rast2.val]/1000', '64BF', 'FIRST'))).sum / p.area_meters,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.depth, '[rast1] * [rast2]/1000', '64BF', 'FIRST'))).sum / p.area_meters,
     -- swe:
     -- swe in meters times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
     -- scale factor 1000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast1.val] * [rast2.val]/1000', '64BF', 'FIRST'))).sum / p.area_meters,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast1] * [rast2]/1000', '64BF', 'FIRST'))).sum / p.area_meters,
     -- runoff:
     -- runoff in meters times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
     -- scale factor 100000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.runoff, '[rast1.val] * [rast2.val]/100000', '64BF', 'FIRST'))).sum / p.area_meters,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.runoff, '[rast1] * [rast2]/100000', '64BF', 'FIRST'))).sum / p.area_meters,
     -- sublimation:
     -- sublimation in meters times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
     -- scale factor 100000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation, '[rast1.val] * [rast2.val]/100000', '64BF', 'FIRST'))).sum / p.area_meters,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation, '[rast1] * [rast2]/100000', '64BF', 'FIRST'))).sum / p.area_meters,
     -- sublimation_blowing:
     -- sublimation_blowing in meters times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
     -- scale factor 100000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation_blowing, '[rast1.val] * [rast2.val]/100000', '64BF', 'FIRST'))).sum / p.area_meters,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation_blowing, '[rast1] * [rast2]/100000', '64BF', 'FIRST'))).sum / p.area_meters,
     -- precip_solid:
     -- precip_solid in meters times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
     -- scale factor 10
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_solid, '[rast1.val] * [rast2.val]/10', '64BF', 'FIRST'))).sum / p.area_meters,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_solid, '[rast1] * [rast2]/10', '64BF', 'FIRST'))).sum / p.area_meters,
     -- precip_liquid:
     -- precip_liquid in meters times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
     -- scale factor 10
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_liquid, '[rast1.val] * [rast2.val]/10', '64BF', 'FIRST'))).sum / p.area_meters,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_liquid, '[rast1] * [rast2]/10', '64BF', 'FIRST'))).sum / p.area_meters,
     -- average_temp:
     -- temperature in kelvin times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
     -- scale factor 1
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.average_temp, '[rast1.val] * [rast2.val]', '64BF', 'FIRST'))).sum / p.area_meters
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.average_temp, '[rast1] * [rast2]', '64BF', 'FIRST'))).sum / p.area_meters
   );
 END;
 $$;
@@ -735,7 +735,7 @@ CREATE OR REPLACE FUNCTION pourpoint.rasterize_2(
   _q_s snodas.geotransform
 )
 RETURNS raster
-LANGUAGE plpgsql IMMUTABLE
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
 AS $$
 DECLARE
   _q_r raster;
