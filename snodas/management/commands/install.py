@@ -6,9 +6,6 @@ import warnings
 
 from getpass import getpass
 
-from six import iteritems
-from six.moves import input
-
 try:
     from django.core.management.base import (
         BaseCommand, CommandError, CommandParser
@@ -465,7 +462,7 @@ class Install(object):
         if self.verbosity < 2:
             return
         print('Using the following configuration settings:')
-        for key, val in sorted(iteritems(self.settings)):
+        for key, val in sorted(self.settings.items()):
             print("    {} = {}".format(key, val))
 
     def vprint(self, level, *args, **kwargs):

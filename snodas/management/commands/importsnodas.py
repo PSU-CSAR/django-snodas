@@ -7,8 +7,6 @@ import shutil
 
 from datetime import datetime
 
-from six import iteritems
-
 from django.conf import settings
 from django.core import management
 from django.core.management.base import BaseCommand, CommandError
@@ -105,7 +103,7 @@ def extract_snodas_data(snodas_tar):
 
 def validate_raster_dates(rasters):
     dates = set()
-    for key, raster in iteritems(rasters):
+    for key, raster in rasters.items():
         dates.add(raster['info'].date)
 
     if len(dates) > 1:
