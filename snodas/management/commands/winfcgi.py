@@ -39,7 +39,7 @@ import logging
 import sys
 import traceback
 import datetime
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from optparse import OptionParser
 from django.core.management.base import BaseCommand
 from django.conf import settings
@@ -207,7 +207,7 @@ class InputStream(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         r = self.readline()
         if not r:
             raise StopIteration
@@ -369,13 +369,13 @@ def encode_pair(name, value):
     if nameLength < 128:
         s = chr(nameLength)
     else:
-        s = struct.pack('!L', nameLength | 0x80000000L)
+        s = struct.pack('!L', nameLength | 0x80000000)
 
     valueLength = len(value)
     if valueLength < 128:
         s += chr(valueLength)
     else:
-        s += struct.pack('!L', valueLength | 0x80000000L)
+        s += struct.pack('!L', valueLength | 0x80000000)
 
     return s + name + value
 
@@ -520,7 +520,7 @@ class Request(object):
 
         try:
             protocolStatus, appStatus = self.server.handler(self)
-        except Exception, instance:
+        except Exception as instance:
             if FCGI_DEBUG:
                 logging.error(traceback.format_exc())
             raise
@@ -536,7 +536,7 @@ class Request(object):
         self._end(appStatus, protocolStatus)
 
 
-    def _end(self, appStatus=0L, protocolStatus=FCGI_REQUEST_COMPLETE):
+    def _end(self, appStatus=0, protocolStatus=FCGI_REQUEST_COMPLETE):
         self._conn.end_request(self, appStatus, protocolStatus)
 
 
@@ -620,7 +620,7 @@ class Connection(object):
         rec.write(self._stdout)
 
 
-    def end_request(self, req, appStatus=0L, protocolStatus=FCGI_REQUEST_COMPLETE, remove=True):
+    def end_request(self, req, appStatus=0, protocolStatus=FCGI_REQUEST_COMPLETE, remove=True):
         """
         End a Request.
 
@@ -680,7 +680,7 @@ class Connection(object):
 
         if not self._multiplexed and self._requests:
             # Can't multiplex requests.
-            self.end_request(req, 0L, FCGI_CANT_MPX_CONN, remove=False)
+            self.end_request(req, 0, FCGI_CANT_MPX_CONN, remove=False)
         else:
             self._requests[inrec.requestId] = req
 
@@ -841,7 +841,7 @@ class FCGIServer(object):
                 try:
                     if headers_sent:
                         # Re-raise if too late
-                        raise exc_info[0], exc_info[1], exc_info[2]
+                        raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
                 finally:
                     exc_info = None # avoid dangling circular ref
             else:
@@ -898,23 +898,23 @@ class FCGIServer(object):
         environ['SCRIPT_NAME'] = ''
 
         reqUri = None
-        if environ.has_key('REQUEST_URI'):
+        if 'REQUEST_URI' in environ:
             reqUri = environ['REQUEST_URI'].split('?', 1)
 
-        if not environ.has_key('PATH_INFO') or not environ['PATH_INFO']:
+        if 'PATH_INFO' not in environ or not environ['PATH_INFO']:
             if reqUri is not None:
                 environ['PATH_INFO'] = reqUri[0]
             else:
                 environ['PATH_INFO'] = ''
 
         # convert %XX to python unicode
-        environ['PATH_INFO'] = urllib.unquote(environ['PATH_INFO'])
+        environ['PATH_INFO'] = urllib.parse.unquote(environ['PATH_INFO'])
 
         # process app_root
         if self.app_root and environ['PATH_INFO'].startswith(self.app_root):
             environ['PATH_INFO'] = environ['PATH_INFO'][len(self.app_root):]
 
-        if not environ.has_key('QUERY_STRING') or not environ['QUERY_STRING']:
+        if 'QUERY_STRING' not in environ or not environ['QUERY_STRING']:
             if reqUri is not None and len(reqUri) > 1:
                 environ['QUERY_STRING'] = reqUri[1]
             else:
@@ -926,7 +926,7 @@ class FCGIServer(object):
                               ('SERVER_NAME', 'localhost'),
                               ('SERVER_PORT', '80'),
                               ('SERVER_PROTOCOL', 'HTTP/1.0')]:
-            if not environ.has_key(name):
+            if name not in environ:
                 environ['wsgi.errors'].write('%s: missing FastCGI param %s '
                                              'required by WSGI!\n' %
                                              (self.__class__.__name__, name))
@@ -962,7 +962,7 @@ def example_application(environ, start_response):
     '''example wsgi app which outputs wsgi environment'''
     logging.debug('wsgi app started')
     data = ''
-    env_keys = environ.keys()
+    env_keys = list(environ.keys())
     env_keys.sort()
     for e in env_keys:
         data += '%s: %s\n' % (e, environ[e])

@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 from contextlib import contextmanager
 
 
@@ -210,7 +209,7 @@ class FileWrapper(object):
         position += self.start
         self.filelike.seek(position)
 
-    def next(self):
+    def __next__(self):
         try:
             return self._read()
         except IndexError:

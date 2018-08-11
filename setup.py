@@ -2,7 +2,7 @@
 from setuptools import setup, find_packages
 
 
-PYTHON_REQUIREMENTS = '>=2.7.11,<3.0'
+PYTHON_REQUIREMENTS = '>=3.6'
 
 
 def get_readme():
@@ -48,7 +48,6 @@ def main():
             'GDAL>=2.1.0',
             'django-split-settings>=0.2.4',
             'pyyaml>=3.12',
-            'six>=1.10.0',
         ],
         extras_require={
             'CORS': ['django-cors-headers>=2.0.2'],

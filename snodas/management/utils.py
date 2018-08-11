@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import argparse
 import os
 import random
@@ -16,7 +14,7 @@ SETTINGS_DIR = os.path.join(
 
 def to_namedtuple(dictionary):
     from collections import namedtuple
-    return namedtuple('GenericDict', dictionary.keys())(**dictionary)
+    return namedtuple('GenericDict', list(dictionary.keys()))(**dictionary)
 
 
 def get_default(dictionary, key, default=None):

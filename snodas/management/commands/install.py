@@ -1,5 +1,3 @@
-from __future__ import absolute_import, print_function
-
 import os
 import sys
 import argparse
@@ -356,7 +354,7 @@ class Install(object):
         settings['SITE_DOMAIN_NAME'] = utils.get_default(
             options,
             'domain',
-            input('Enter in the domain name for this project instance: '),
+            eval(input('Enter in the domain name for this project instance: ')),
         )
 
         settings['ADDITIONAL_SETTINGS_FILES'] = utils.get_default(

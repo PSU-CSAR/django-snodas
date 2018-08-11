@@ -1,5 +1,4 @@
 # encoding: utf-8
-
 # FastCGI Windows Server Django installation command
 #
 # Copyright (c) 2012 Openance SARL
@@ -26,8 +25,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-from __future__ import print_function, absolute_import
-
 import os
 import sys
 import re

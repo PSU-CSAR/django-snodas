@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import json
 
 from django.db import connection
@@ -82,7 +80,7 @@ def get_for_doy(request, start_year, end_year, doy):
             status=400,
         )
 
-    if doy not in xrange(1, 367):
+    if doy not in range(1, 367):
         return HttpResponse(
             reason='Day-of-year {} is not a valid value'.format(doy),
             status=400,

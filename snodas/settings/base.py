@@ -1,8 +1,6 @@
 """
 Django settings for snodas project.
 """
-from __future__ import absolute_import
-
 import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)

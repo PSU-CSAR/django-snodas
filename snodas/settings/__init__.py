@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from split_settings.tools import optional, include
 
 from ..management.utils import load_conf_file

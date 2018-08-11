@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from django.apps import AppConfig, apps
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
