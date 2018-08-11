@@ -1,5 +1,5 @@
 # Byte-compiled / optimized / DLL files
-# __pycache__/
+__pycache__/
 *.py[cod]
 
 # C extensions
@@ -60,11 +60,9 @@ docs/_build/
 # PyBuilder
 target/
 
-# ebagis stuff
-start_celery.bat
+# snodas stuff
 project.conf
-/aois/
-ebagis/settings/local_settings.py
+snodas/settings/local_settings.py
 touch_this_file_to_update_cgi.txt
 
 # Other
