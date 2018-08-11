@@ -44,13 +44,13 @@ def main():
         python_requires=PYTHON_REQUIREMENTS,
         install_requires=[
             'psycopg2-binary>=2.7.1',
-            'Django>=1.11',
+            'Django>=2.1',
             'GDAL>=2.1.0',
-            'django-split-settings>=0.2.4',
+            'django-split-settings>=0.3.0',
             'pyyaml>=3.12',
+            'django-cors-headers>=2.4.0',
         ],
         extras_require={
-            'CORS': ['django-cors-headers>=2.0.2'],
         },
         dependency_links=[
         ],
