@@ -1,4 +1,5 @@
 CREATE EXTENSION pg_tms CASCADE;
+CREATE EXTENSION btree_gist;
 CREATE SCHEMA snodas;
 CREATE SCHEMA pourpoint;
 
@@ -522,7 +523,7 @@ CREATE TABLE pourpoint.rasterized (
   "rast" raster NOT NULL,
   "area_meters" float NOT NULL,
   UNIQUE (pourpoint_id, valid_dates),
-  EXCLUDE USING gist (valid_dates WITH &&)
+  EXCLUDE USING gist (pourpoint_id with =, valid_dates WITH &&)
   -- TODO: add raster constraints like snodas table
 );
 
@@ -533,15 +534,24 @@ CREATE TABLE pourpoint.statistics (
   "rasterized_id" integer NOT NULL REFERENCES pourpoint.rasterized ON DELETE CASCADE,
   "pourpoint_id" integer NOT NULL REFERENCES pourpoint.pourpoint ON DELETE CASCADE,
   "date" date NOT NULL REFERENCES snodas.raster ON DELETE CASCADE,
-  "snowcover" float NOT NULL,            -- percent
-  "depth" float NOT NULL,                -- meters
-  "swe" float NOT NULL,                  -- meters
-  "runoff" float NOT NULL,               -- meters
-  "sublimation" float NOT NULL,         -- meters
-  "sublimation_blowing" float NOT NULL,  -- meters
-  "precip_solid" float NOT NULL,         -- kg/m^2
-  "precip_liquid" float NOT NULL,        -- kg/m^2
-  "average_temp" float NOT NULL,          -- kelvin
+  "snowcover" float NOT NULL               -- percent
+    CHECK (snowcover BETWEEN 0 and 100),
+  "depth" float NOT NULL                   -- meters
+    CHECK (depth >= 0),
+  "swe" float NOT NULL                     -- meters
+    CHECK (swe >= 0),
+  "runoff" float NOT NULL                  -- meters
+    CHECK (runoff >= 0),
+  "sublimation" float NOT NULL             -- meters
+    CHECK (sublimation >= 0),
+  "sublimation_blowing" float NOT NULL     -- meters
+    CHECK (sublimation_blowing >= 0),
+  "precip_solid" float NOT NULL            -- kg/m^2
+    CHECK (precip_solid >= 0),
+  "precip_liquid" float NOT NULL           -- kg/m^2
+    CHECK (precip_liquid >= 0),
+  "average_temp" float                     -- kelvin (null if nodata in all cells)
+    CHECK (average_temp  >= 0),
   PRIMARY KEY (pourpoint_id, date)
 );
 
@@ -553,8 +563,8 @@ CREATE OR REPLACE FUNCTION pourpoint.calc_stats_1(
   p pourpoint.rasterized,
   s snodas.raster
 )
-RETURNS void
-LANGUAGE plpgsql VOLATILE
+RETURNS pourpoint.statistics
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
 AS $$
 BEGIN
   IF NOT p.valid_dates @> s.date THEN
@@ -564,20 +574,7 @@ BEGIN
       USING HINT = 'Make sure you call pourpoint_calc_stats with a valid pourpoint raster for the SNODAS date.';
   END IF;
 
-  INSERT INTO pourpoint.statistics (
-      rasterized_id,
-      pourpoint_id,
-      date,
-      snowcover,
-      depth,
-      swe,
-      runoff,
-      sublimation,
-      sublimation_blowing,
-      precip_solid,
-      precip_liquid,
-      average_temp
-  ) VALUES (
+  RETURN (
     p.rasterized_id,
     p.pourpoint_id,
     s.date,
@@ -587,33 +584,40 @@ BEGIN
     -- pourpoint raster multiplied by 100
     ST_Count(ST_MapAlgebra(p.rast, s.swe, '[rast1]', NULL, 'FIRST'))::float / ST_Count(p.rast) * 100,
     -- snow depth (meters):
-    -- average of all cells with data in both rasters
+    -- average of all cells with data in first
+    -- nodata in second counts as 0
     -- scale factor 1000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.depth, '[rast2]/1000', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.depth, '[rast2]/1000', '64BF', 'FIRST', NULL, '0'))).mean,
     -- swe (meters):
-    -- average of all cells with data in both rasters
+    -- average of all cells with data in first
+    -- nodata in second counts as 0
     -- scale factor 1000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast2]/1000', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.swe, '[rast2]/1000', '64BF', 'FIRST', NULL, '0'))).mean,
     -- runoff (meters):
-    -- average of all cells with data in both rasters
+    -- average of all cells with data in first
+    -- nodata in second counts as 0
     -- scale factor 100000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.runoff, '[rast2]/100000', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.runoff, '[rast2]/100000', '64BF', 'FIRST', NULL, '0'))).mean,
     -- sublimation (meters):
-    -- average of all cells with data in both rasters
+    -- average of all cells with data in first
+    -- nodata in second counts as 0
     -- scale factor 100000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation, '[rast2]/100000', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation, '[rast2]/100000', '64BF', 'FIRST', NULL, '0'))).mean,
     -- sublimation_blowing (meters):
-    -- average of all cells with data in both rasters
+    -- average of all cells with data in first
+    -- nodata in second counts as 0
     -- scale factor 100000
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation_blowing, '[rast2]/100000', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.sublimation_blowing, '[rast2]/100000', '64BF', 'FIRST', NULL, '0'))).mean,
     -- precip_solid (meters):
-    -- average of all cells with data in both rasters
+    -- average of all cells with data in first
+    -- nodata in second counts as 0
     -- scale factor 10
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_solid, '[rast2]/10', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_solid, '[rast2]/10', '64BF', 'FIRST', NULL, '0'))).mean,
     -- precip_liquid (meters):
-    -- average of all cells with data in both rasters
+    -- average of all cells with data in first
+    -- nodata in second counts as 0
     -- scale factor 10
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_liquid, '[rast2]/10', '64BF', 'FIRST'))).mean,
+    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.precip_liquid, '[rast2]/10', '64BF', 'FIRST', NULL, '0'))).mean,
     -- average_temp (kelvin):
     -- average of all cells with data in both rasters
     -- scale factor 1
@@ -629,8 +633,8 @@ CREATE OR REPLACE FUNCTION pourpoint.calc_stats_2(
   p pourpoint.rasterized,
   s snodas.raster
 )
-RETURNS void
-LANGUAGE plpgsql VOLATILE
+RETURNS pourpoint.statistics
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
 AS $$
 BEGIN
   IF NOT p.valid_dates @> s.date THEN
@@ -640,20 +644,7 @@ BEGIN
       USING HINT = 'Make sure you call pourpoint_calc_stats with a valid pourpoint raster for the SNODAS date.';
   END IF;
 
-  INSERT INTO pourpoint.statistics (
-      rasterized_id,
-      pourpoint_id,
-      date,
-      snowcover,
-      depth,
-      swe,
-      runoff,
-      sublimation,
-      sublimation_blowing,
-      precip_solid,
-      precip_liquid,
-      average_temp
-  ) VALUES (
+  RETURN (SELECT
     p.rasterized_id,
     p.pourpoint_id,
     s.date,
@@ -720,7 +711,11 @@ RETURNS raster
 LANGUAGE plpgsql IMMUTABLE
 AS $$
 BEGIN
-  RETURN (SELECT ST_AsRaster(_q_p.polygon, _q_s.rast, '1BB'::text));
+  -- the type here is dumb: we should be able to use
+  -- 1BUI as this is a boolean mask raster
+  -- but ST_MapAlgebra is lame and uses the 0 nodata value
+  -- for its output, so we need a datatype that supports -9999
+  RETURN (SELECT ST_AsRaster(_q_p.polygon, _q_s.rast, '16BSI'::text, 1, -9999));
 END;
 $$;
 
@@ -747,7 +742,7 @@ BEGIN
     FROM (
       SELECT
         ST_PixelAsPolygons(
-          ST_AsRaster(_q_p.polygon, _q_s.rast, '1BB'::text)
+          ST_AsRaster(_q_p.polygon, _q_s.rast, '16BSI'::text, 1, -9999)
         ) as _g
     ) as _h
   )
@@ -770,7 +765,7 @@ $$;
 
 -- trigger on insert/update of pourpoint geom
 -- to make pixel join table entries with areas
-CREATE OR REPLACE FUNCTION pourpoint.rasterize_and_calc()
+CREATE OR REPLACE FUNCTION pourpoint.rasterize()
 RETURNS TRIGGER
 LANGUAGE plpgsql VOLATILE
 AS $$
@@ -793,8 +788,23 @@ BEGIN
       NEW.area_meters
     FROM snodas.geotransform as s;
 
+  RETURN NULL;
+END;
+$$;
+
+-- trigger on insert/update of pourpoint geom
+-- to calc all snodas stats
+CREATE OR REPLACE FUNCTION pourpoint.calc_stats()
+RETURNS TRIGGER
+LANGUAGE plpgsql VOLATILE
+AS $$
+BEGIN
+  -- if update deletes existing rasterization
+  -- cascade will also delete any statistics
+
   -- calc the pourpoint stats for all snodas dates
-  PERFORM pourpoint.calc_stats_1((p), (s))
+  INSERT INTO pourpoint.statistics
+    SELECT (pourpoint.calc_stats_1((p), (S))).*
     FROM pourpoint.rasterized as p, snodas.raster as s
     WHERE
       NEW.pourpoint_id = p.pourpoint_id AND
@@ -817,7 +827,8 @@ BEGIN
 
   -- calc the pourpoint stats for all
   -- pourpoints with this snodas data
-  PERFORM pourpoint.calc_stats_1((p), NEW)
+  INSERT INTO pourpoint.statistics
+    SELECT (pourpoint.calc_stats_1((p), NEW)).*
     FROM pourpoint.rasterized as p
     WHERE
       p.valid_dates @> NEW.date;
@@ -827,17 +838,30 @@ END;
 $$;
 
 -- new pourpoint with polygon
-CREATE TRIGGER pourpoint_insert_rasterize_and_calc
+CREATE TRIGGER pourpoint_insert_rasterize
 AFTER INSERT ON pourpoint.pourpoint
 FOR EACH ROW WHEN (NEW.polygon is not NULL)
-EXECUTE PROCEDURE pourpoint.rasterize_and_calc();
+EXECUTE PROCEDURE pourpoint.rasterize();
 
 -- update on pourpoint with new polygon
-CREATE TRIGGER pourpoint_update_rasterize_and_calc
+CREATE TRIGGER pourpoint_update_rasterize
 AFTER UPDATE ON pourpoint.pourpoint
 FOR EACH ROW WHEN (
   OLD.polygon IS DISTINCT FROM NEW.polygon
-) EXECUTE PROCEDURE pourpoint.rasterize_and_calc();
+) EXECUTE PROCEDURE pourpoint.rasterize();
+
+-- new pourpoint with polygon
+CREATE TRIGGER pourpoint_insert_calc_stats
+AFTER INSERT ON pourpoint.pourpoint
+FOR EACH ROW WHEN (NEW.polygon is not NULL)
+EXECUTE PROCEDURE pourpoint.calc_stats();
+
+-- update on pourpoint with new polygon
+CREATE TRIGGER pourpoint_update_calc_stats
+AFTER UPDATE ON pourpoint.pourpoint
+FOR EACH ROW WHEN (
+  OLD.polygon IS DISTINCT FROM NEW.polygon
+) EXECUTE PROCEDURE pourpoint.calc_stats();
 
 -- new or updated snodas
 CREATE TRIGGER raster_calc_stats_trigger
