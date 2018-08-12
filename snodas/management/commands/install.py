@@ -218,6 +218,12 @@ class Install(object):
 
         # env options
         parser.add_argument(
+            '--conda',
+            default='conda',
+            help=('The conda executable to use to make the environment. '
+                  'Default is to use whatever conda is on the path.'),
+        )
+        parser.add_argument(
             '--no-env',
             dest='make_env',
             action='store_false',
@@ -384,15 +390,17 @@ class Install(object):
         # and setup.py should be importable
         from setup import PYTHON_REQUIREMENTS
 
+        conda = options.get('conda')
+
         conda_info = json.loads(
-                subprocess.check_output(['conda', 'info', '--json'])
+                subprocess.check_output([conda, 'info', '--json'])
             )
 
         name = self.settings['INSTANCE_NAME']
 
         # build the env create command
         install_cmd = [
-            'conda', 'create', '-y', '-n', name,
+            conda, 'create', '-y', '-n', name,
             'python{}'.format(PYTHON_REQUIREMENTS),
         ]
 
