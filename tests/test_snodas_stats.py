@@ -183,7 +183,7 @@ class ConstantSNODASTestCase(TestCase):
             # add a pourpoint geom
             s1 = datetime.now()
             print('Adding a pourpoint geom...')
-	    cursor.execute(pourpoint_sql)
+            cursor.execute(pourpoint_sql)
             print('Pourpoint added in {}.'.format(datetime.now()-s1))
 
     def test_check_stats(self):
