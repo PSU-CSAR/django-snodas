@@ -49,6 +49,7 @@ def main():
             'django-split-settings>=0.3.0',
             'pyyaml>=3.12',
             'django-cors-headers>=2.4.0',
+            'sqlparse>=0.2.4',
         ],
         extras_require={
         },
