@@ -3,7 +3,7 @@ import json
 from django.db import connection
 from django.http import HttpResponse
 
-from .exceptions import GeoJSONValidationError
+from ..exceptions import GeoJSONValidationError
 
 
 def validate_geojson(geom):
