@@ -79,12 +79,12 @@ class Command(BaseCommand):
         dbport = get_default(dbinfo, 'PORT', 5432)
 
         if options.get('interactive'):
-            confirm = eval(input(
+            confirm = input(
                 ('You have requested to drop the database.\n'
                  'This will IRREVERSIBLY DESTROY\n'
                  'ALL data in the database "{}".\n'
                  'Are you sure you want to do this?\n'
-                 'Type "yes" to continue, or "no" to cancel: ').format(dbname)))
+                 'Type "yes" to continue, or "no" to cancel: ').format(dbname))
         else:
             confirm = 'yes'
 
