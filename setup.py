@@ -2,7 +2,7 @@
 from setuptools import setup, find_packages
 
 
-PYTHON_REQUIREMENTS = '>=3.6'
+PYTHON_REQUIREMENTS = '=>3.6'
 
 
 def get_readme():
