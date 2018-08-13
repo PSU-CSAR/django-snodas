@@ -571,7 +571,7 @@ BEGIN
     RAISE EXCEPTION 'SNODAS date not within pourpoint raster valid dates: % not in %',
         s.date,
         p.valid_dates
-      USING HINT = 'Make sure you call pourpoint_calc_stats with a valid pourpoint raster for the SNODAS date.';
+      USING HINT = 'Make sure you call pourpoint.calc_stats_1 with a valid pourpoint raster for the SNODAS date.';
   END IF;
 
   RETURN (
@@ -641,7 +641,7 @@ BEGIN
     RAISE EXCEPTION 'SNODAS date not within pourpoint raster valid dates: % not in %',
         s.date,
         p.valid_dates
-      USING HINT = 'Make sure you call pourpoint_calc_stats with a valid pourpoint raster for the SNODAS date.';
+      USING HINT = 'Make sure you call pourpoint.calc_stats_2 with a valid pourpoint raster for the SNODAS date.';
   END IF;
 
   RETURN (SELECT
@@ -808,7 +808,7 @@ BEGIN
     FROM
       pourpoint.rasterized as p,
       snodas.raster as s,
-      pourpoint.calc_stats_1((p), (S)) as r
+      pourpoint.calc_stats_1((p), (s)) as r
     WHERE
       NEW.pourpoint_id = p.pourpoint_id AND
       p.valid_dates @> s.date;
