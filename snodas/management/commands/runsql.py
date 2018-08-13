@@ -77,20 +77,33 @@ class Command(BaseCommand):
         )
 
     def handle(self, *sqlfiles, **options):
+        self.verbosity = options['verbosity']
         db = options['database']
         self.conn = connections[db]
         sf_readers = {sf: self.get_reader(sf) for sf in sqlfiles}
 
         for sqlfile, reader in sf_readers.items():
+            self.vprint(2, 'Processing file {}...'.format(sqlfile))
+
+            self.vprint(2, '...opening file...')
             opener, mode = reader
+            self.vprint(3, '...using reader {}...'.format(opener))
             with opener(sqlfile, mode) as s:
                 sql = s.read()
+            self.vprint(2, 'File opened.')
 
+
+            self.vprint(2, 'Running sql...')
             if options['use_transaction']:
                 with transaction.atomic(using=db):
+                    self.vprint(
+                        2, '...opened transaction...',
+                    )
                     self.runsql(sql)
+
             else:
                 self.runsql(sql)
+            self.vprint(2, 'sql completed.')
 
         # Close the DB connection -- unless we're still in a transaction. This
         # is required as a workaround for an edge case in MySQL: if the same
@@ -103,14 +116,20 @@ class Command(BaseCommand):
         for statement in sqlparse.split(sql):
             if not statement:
                 continue
-            print(statement)
+            self.vprint(3, statement, pretty=True)
             with self.conn.cursor() as cur:
                 cur.execute(statement)
                 try:
-                    pprint(cur.fetchall())
+                    self.vprint(1, cur.fetchall(), pretty=True)
                 except:
-                    print(cur.statusmessage)
+                    self.vprint(1, cur.statusmessage)
 
+    def vprint(self, level, *args, **kwargs):
+        _print = print
+        if kwargs.pop('pretty', False):
+            _print = pprint
+        if self.verbosity >= level:
+            _print(*args, **kwargs)
 
     def get_reader(self, sqlfile):
         """
