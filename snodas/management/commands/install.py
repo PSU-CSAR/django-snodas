@@ -1,5 +1,8 @@
+from __future__ import print_function, absolute_import
+
 import os
 import sys
+import yaml
 import argparse
 import subprocess
 import warnings
@@ -23,6 +26,13 @@ try:
     from .. import utils
 except ValueError:
     import utils
+
+
+if sys.version_info[0] == 2:
+    iteritems = dict.iteritems
+    input = raw_input
+else:
+    iteritems = dict.items
 
 
 class remove_const(argparse.Action):
@@ -357,7 +367,7 @@ class Install(object):
         settings['SITE_DOMAIN_NAME'] = utils.get_default(
             options,
             'domain',
-            eval(input('Enter in the domain name for this project instance: ')),
+            input('Enter in the domain name for this project instance: '),
         )
 
         settings['ADDITIONAL_SETTINGS_FILES'] = utils.get_default(
@@ -449,7 +459,6 @@ class Install(object):
         cmd = [
             pip, 'install', '-e',
             '{}{}'.format(utils.get_project_root(), install_options),
-            '--process-dependency-links'
         ]
 
         self.vprint(
@@ -470,7 +479,7 @@ class Install(object):
         if self.verbosity < 2:
             return
         print('Using the following configuration settings:')
-        for key, val in sorted(self.settings.items()):
+        for key, val in sorted(iteritems(self.settings)):
             print("    {} = {}".format(key, val))
 
     def vprint(self, level, *args, **kwargs):
