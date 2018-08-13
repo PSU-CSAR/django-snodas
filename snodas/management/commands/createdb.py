@@ -124,6 +124,19 @@ class Command(BaseCommand):
                     ),
                 )
 
+        with connect(
+            dbname=dbname,
+            user=createuser,
+            password=createpass,
+            host=dbhost,
+            port=dbport,
+        ) as connection:
+            connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            with connection.cursor() as cursor:
+                # let's add the extenions that require superuser permissions
+                cursor.execute('CREATE EXTENSION pg_tms CASCADE')
+                cursor.execute('CREATE EXTENSION btree_gist')
+
         print((
             '\nDatabase {} created. '
             'Be sure to run the data migrations:\n\n'

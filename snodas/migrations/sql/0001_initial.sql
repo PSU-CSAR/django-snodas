@@ -1,5 +1,16 @@
-CREATE EXTENSION pg_tms CASCADE;
-CREATE EXTENSION btree_gist;
+-- this file should be run as the 'app' user
+-- so the 'app' user becomes the owner of all
+
+-------------------------------------------------------------------
+-- extensions (added elsewhere, requires superuser permissions)
+-------------------------------------------------------------------
+CREATE EXTENSION IF NOT EXISTS pg_tms CASCADE;
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+
+--------------
+-- schemas
+--------------
 CREATE SCHEMA snodas;
 CREATE SCHEMA pourpoint;
 
