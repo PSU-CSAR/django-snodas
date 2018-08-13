@@ -3,8 +3,6 @@ import json
 from django.db import connection
 from django.http import HttpResponse
 
-from .exceptions import GeoJSONValidationError
-
 
 def list_dates(request):
     if request.method != 'GET':
