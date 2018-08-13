@@ -804,8 +804,11 @@ BEGIN
 
   -- calc the pourpoint stats for all snodas dates
   INSERT INTO pourpoint.statistics
-    SELECT (pourpoint.calc_stats_1((p), (S))).*
-    FROM pourpoint.rasterized as p, snodas.raster as s
+    SELECT r.*
+    FROM
+      pourpoint.rasterized as p,
+      snodas.raster as s,
+      pourpoint.calc_stats_1((p), (S)) as r
     WHERE
       NEW.pourpoint_id = p.pourpoint_id AND
       p.valid_dates @> s.date;
@@ -828,8 +831,9 @@ BEGIN
   -- calc the pourpoint stats for all
   -- pourpoints with this snodas data
   INSERT INTO pourpoint.statistics
-    SELECT (pourpoint.calc_stats_1((p), NEW)).*
-    FROM pourpoint.rasterized as p
+    SELECT r.*
+    FROM pourpoint.rasterized as p,
+      pourpoint.calc_stats_1((p), NEW) as r
     WHERE
       p.valid_dates @> NEW.date;
   
