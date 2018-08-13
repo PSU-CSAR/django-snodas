@@ -106,7 +106,7 @@ class Command(BaseCommand):
                 # create the login user
                 try:
                     cursor.execute(
-                        "CREATE ROLE {} LOGIN WITH ENCRYPTED PASSWORD '{}' IN ROLE {}".format(
+                        "CREATE ROLE {} WITH LOGIN ENCRYPTED PASSWORD '{}' IN ROLE {}".format(
                             dbuser,
                             dbpass,
                             owner,
