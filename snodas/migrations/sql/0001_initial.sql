@@ -169,7 +169,7 @@ DECLARE
 BEGIN
   -- clean out old tiles so we can rebuild
   DELETE FROM snodas.tiles WHERE date = NEW.date;
-  
+
   -- create the tiles
   INSERT INTO snodas.tiles
     (date, rast, x, y, zoom)
@@ -235,13 +235,13 @@ BEGIN
     ORDER BY zoom DESC
     LIMIT 1
     INTO _q_tile;
-    
+
     -- if the generated tile has no data then we just set it
     -- to null, reducing the size of the saved row
     IF _q_tile IS NOT NULL AND NOT tms_has_data(_q_tile) THEN
       _q_tile := NULL;
     END IF;
-    
+
     -- we save the generated tile for next time
     INSERT INTO snodas.raster_tiles (
       rast,
@@ -395,7 +395,7 @@ BEGIN
           ) as poly
       ) AS polygons)
     );
-      
+
     -- we save the generated tile for next time
     INSERT INTO pourpoint.tile (
       tile,
@@ -522,7 +522,7 @@ INSERT INTO snodas.geotransform (rast, valid_dates) VALUES
      0,
      4326),
    daterange(NULL, '2013-10-01', '()'));
-  
+
 
 -- stores raster version of pourpoints with pixel values
 -- equal to the pourpoint area in each pixel
@@ -552,15 +552,15 @@ CREATE TABLE pourpoint.statistics (
   "swe" float NOT NULL                     -- meters
     CHECK (swe >= 0),
   "runoff" float NOT NULL                  -- meters
-    CHECK (runoff >= 0),
+    --CHECK (runoff >= 0),
   "sublimation" float NOT NULL             -- meters
-    CHECK (sublimation >= 0),
+    --CHECK (sublimation >= 0),
   "sublimation_blowing" float NOT NULL     -- meters
-    CHECK (sublimation_blowing >= 0),
+    --CHECK (sublimation_blowing >= 0),
   "precip_solid" float NOT NULL            -- kg/m^2
-    CHECK (precip_solid >= 0),
+    --CHECK (precip_solid >= 0),
   "precip_liquid" float NOT NULL           -- kg/m^2
-    CHECK (precip_liquid >= 0),
+    --CHECK (precip_liquid >= 0),
   "average_temp" float                     -- kelvin (null if nodata in all cells)
     CHECK (average_temp  >= 0),
   PRIMARY KEY (pourpoint_id, date)
@@ -823,7 +823,7 @@ BEGIN
     WHERE
       NEW.pourpoint_id = p.pourpoint_id AND
       p.valid_dates @> s.date;
-  
+
   RETURN NULL;
 END;
 $$;
@@ -847,7 +847,7 @@ BEGIN
       pourpoint.calc_stats_1((p), NEW) as r
     WHERE
       p.valid_dates @> NEW.date;
-  
+
   RETURN NULL;
 END;
 $$;
