@@ -6,7 +6,7 @@ def get_tile(request, zoom, x, y):
     if request.method != 'GET':
         return HttpResponse(reason="Not allowed", status=405)
 
-    query = 'SELECT get_pourpoint_tile(%s, %s, %s);'
+    query = 'SELECT pourpoint.get_tile(%s, %s, %s);'
 
     with connection.cursor() as cursor:
         cursor.execute(
