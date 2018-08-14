@@ -37,10 +37,36 @@ import os
 import os.path
 import logging
 import sys
-import traceback
 import datetime
-import urllib.request, urllib.parse, urllib.error
 from optparse import OptionParser
+
+if sys.version_info >= (3,):
+    long_int = int
+    bytes_type = bytes
+    import urllib.parse as url_parse
+
+    def char_to_int(value):
+        return int(value)
+
+    def int_to_char(value):
+        return bytes([value])
+
+    def make_bytes(content):
+        return bytes(content, FCGI_CONTENT_ENCODING) if type(content) is str else content
+else:
+    long_int = long
+    bytes_type = str
+    import urllib as url_parse
+
+    def char_to_int(value):
+        return ord(value)
+
+    def int_to_char(value):
+        return chr(value)
+
+    def make_bytes(content):
+        return content
+
 from django.core.management.base import BaseCommand
 from django.conf import settings
 
@@ -99,9 +125,15 @@ FCGI_HEADER_NAMES = (
     'UNKNOWN_TYPE',
 )
 
+# configuration not from the spec
+
+FCGI_PARAMS_ENCODING = "utf-8"
+FCGI_CONTENT_ENCODING = FCGI_PARAMS_ENCODING
+
 FCGI_DEBUG = getattr(settings, 'FCGI_DEBUG', settings.DEBUG)
 FCGI_LOG = getattr(settings, 'FCGI_LOG', FCGI_DEBUG)
 FCGI_LOG_PATH = getattr(settings, 'FCGI_LOG_PATH', os.path.dirname(os.path.abspath(sys.argv[0])))
+
 
 class InputStream(object):
     """
@@ -115,12 +147,12 @@ class InputStream(object):
         # See Server.
         self._shrinkThreshold = conn.server.inputStreamShrinkThreshold
 
-        self._buf = ''
+        self._buf = b''
         self._bufList = []
-        self._pos = 0 # Current read position.
-        self._avail = 0 # Number of bytes currently available.
+        self._pos = 0  # Current read position.
+        self._avail = 0  # Number of bytes currently available.
 
-        self._eof = False # True when server has sent EOF notification.
+        self._eof = False  # True when server has sent EOF notification.
 
     def _shrinkBuffer(self):
         """Gets rid of already read data (since we can't rewind)."""
@@ -137,7 +169,7 @@ class InputStream(object):
 
     def read(self, n=-1):
         if self._pos == self._avail and self._eof:
-            return ''
+            return b''
         while True:
             if n < 0 or (self._avail - self._pos) < n:
                 # Not enough data available.
@@ -152,9 +184,9 @@ class InputStream(object):
             else:
                 newPos = self._pos + n
                 break
-            # Merge buffer list, if necessary.
+                # Merge buffer list, if necessary.
         if self._bufList:
-            self._buf += ''.join(self._bufList)
+            self._buf += b''.join(self._bufList)
             self._bufList = []
         r = self._buf[self._pos:newPos]
         self._pos = newPos
@@ -163,14 +195,14 @@ class InputStream(object):
 
     def readline(self, length=None):
         if self._pos == self._avail and self._eof:
-            return ''
+            return b''
         while True:
             # Unfortunately, we need to merge the buffer list early.
             if self._bufList:
-                self._buf += ''.join(self._bufList)
+                self._buf += b''.join(self._bufList)
                 self._bufList = []
                 # Find newline.
-            i = self._buf.find('\n', self._pos)
+            i = self._buf.find(b'\n', self._pos)
             if i < 0:
                 # Not found?
                 if self._eof:
@@ -207,7 +239,7 @@ class InputStream(object):
     def __iter__(self):
         return self
 
-    def __next__(self):
+    def next(self):
         r = self.readline()
         if not r:
             raise StopIteration
@@ -233,7 +265,7 @@ class OutputStream(object):
         self._req = req
         self._type = type
         self._buffered = buffered
-        self._bufList = [] # Used if buffered is True
+        self._bufList = []  # Used if buffered is True
         self.dataWritten = False
         self.closed = False
 
@@ -272,7 +304,7 @@ class OutputStream(object):
     def flush(self):
         # Only need to flush if this OutputStream is actually buffered.
         if self._buffered:
-            data = ''.join(self._bufList)
+            data = b''.join(self._bufList)
             self._bufList = []
             self._write(data)
 
@@ -337,14 +369,14 @@ def decode_pair(s, pos=0):
     The number of bytes decoded as well as the name/value pair
     are returned.
     """
-    nameLength = ord(s[pos])
+    nameLength = char_to_int(s[pos])
     if nameLength & 128:
         nameLength = struct.unpack('!L', s[pos:pos + 4])[0] & 0x7fffffff
         pos += 4
     else:
         pos += 1
 
-    valueLength = ord(s[pos])
+    valueLength = char_to_int(s[pos])
     if valueLength & 128:
         valueLength = struct.unpack('!L', s[pos:pos + 4])[0] & 0x7fffffff
         pos += 4
@@ -356,7 +388,12 @@ def decode_pair(s, pos=0):
     value = s[pos:pos + valueLength]
     pos += valueLength
 
-    return pos, (name, value)
+    # when decoding, the fallback encoding must be one which can encode any binary value
+    # i.e. it must be a code-page-based encoding with no undefined values - e.g. cp850.
+    try:
+        return pos, (name.decode(FCGI_PARAMS_ENCODING), value.decode(FCGI_PARAMS_ENCODING))
+    except UnicodeError:
+        return pos, (name.decode('cp850'), value.decode('cp850'))
 
 
 def encode_pair(name, value):
@@ -367,17 +404,22 @@ def encode_pair(name, value):
     """
     nameLength = len(name)
     if nameLength < 128:
-        s = chr(nameLength)
+        s = int_to_char(nameLength)
     else:
-        s = struct.pack('!L', nameLength | 0x80000000)
+        s = struct.pack('!L', nameLength | long_int('0x80000000'))
 
     valueLength = len(value)
     if valueLength < 128:
-        s += chr(valueLength)
+        s += int_to_char(valueLength)
     else:
-        s += struct.pack('!L', valueLength | 0x80000000)
+        s += struct.pack('!L', valueLength | long_int('0x80000000'))
 
-    return s + name + value
+    # when encoding, the fallback encoding must be one which can encode any unicode code point
+    # i.e. it must be a UTF-* encoding.  since we're on the web the default choice is UTF-8.
+    try:
+        return s + name.encode(FCGI_PARAMS_ENCODING) + value.encode(FCGI_PARAMS_ENCODING)
+    except UnicodeError:
+        return s + name.encode('utf-8') + value.encode('utf-8')
 
 
 class Record(object):
@@ -392,8 +434,7 @@ class Record(object):
         self.requestId = requestId
         self.contentLength = 0
         self.paddingLength = 0
-        self.contentData = ''
-
+        self.contentData = b''
 
     def _recvall(stream, length):
         """
@@ -401,49 +442,45 @@ class Record(object):
         (Socket may be blocking or non-blocking.)
         """
 
-        if FCGI_DEBUG:
-            logging.debug('_recvall (%d)' % (length))
+        if FCGI_DEBUG: logging.debug('_recvall (%d)' % (length))
 
         dataList = []
         recvLen = 0
 
         while length:
             data = stream.read(length)
-            if not data: # EOF
+            if not data:  # EOF
                 break
             dataList.append(data)
             dataLen = len(data)
             recvLen += dataLen
             length -= dataLen
 
-        if FCGI_DEBUG: logging.debug('recived length = %d' % (recvLen))
+        # if FCGI_DEBUG: logging.debug('recived length = %d' % (recvLen))
 
-        return ''.join(dataList), recvLen
+        return b''.join(dataList), recvLen
 
     _recvall = staticmethod(_recvall)
 
-
     def read(self, stream):
         """Read and decode a Record from a socket."""
-        try:
-            header, length = self._recvall(stream, FCGI_HEADER_LEN)
-        except:
-            raise
-            raise EOFError
+        header, length = self._recvall(stream, FCGI_HEADER_LEN)
 
         if length < FCGI_HEADER_LEN:
             raise EOFError
 
-        if FCGI_DEBUG:
-            hex = ''
-            for s in header:
-                hex += '%x|' % (ord(s))
-
-        self.version, self.type, self.requestId, self.contentLength,\
+        self.version, self.type, self.requestId, self.contentLength, \
         self.paddingLength = struct.unpack(FCGI_Header, header)
 
         if FCGI_DEBUG:
-            logging.debug('recv fcgi header: %s %s len: %d' % (FCGI_HEADER_NAMES[self.type] if self.type is not None and self.type < FCGI_MAXTYPE else FCGI_HEADER_NAMES[FCGI_MAXTYPE], hex, len(header)))
+            hex = ''
+            for s in header:
+                hex += '%x|' % (char_to_int(s))
+            logging.debug('recv fcgi header: %s %s len: %d' % (
+                FCGI_HEADER_NAMES[self.type] if self.type is not None and self.type < FCGI_MAXTYPE else
+                FCGI_HEADER_NAMES[FCGI_MAXTYPE],
+                hex, len(header)
+            ))
 
         if self.contentLength:
             try:
@@ -469,7 +506,6 @@ class Record(object):
 
     _sendall = staticmethod(_sendall)
 
-
     def write(self, stream):
         """Encode and write a Record to a socket."""
         if not self.contentLength:
@@ -481,7 +517,12 @@ class Record(object):
                              self.requestId, self.contentLength,
                              self.paddingLength)
 
-        if FCGI_DEBUG: logging.debug('send fcgi header: %s' % FCGI_HEADER_NAMES[self.type] if self.type is not None and self.type < FCGI_MAXTYPE else FCGI_HEADER_NAMES[FCGI_MAXTYPE])
+        if FCGI_DEBUG:
+            logging.debug(
+                'send fcgi header: %s' %
+                FCGI_HEADER_NAMES[self.type] if self.type is not None and self.type < FCGI_MAXTYPE else
+                FCGI_HEADER_NAMES[FCGI_MAXTYPE]
+            )
 
         self._sendall(stream, header)
 
@@ -490,8 +531,7 @@ class Record(object):
             self._sendall(stream, self.contentData)
         if self.paddingLength:
             if FCGI_DEBUG: logging.debug('send PADDING')
-            self._sendall(stream, '\x00' * self.paddingLength)
-
+            self._sendall(stream, b'\x00' * self.paddingLength)
 
 
 class Request(object):
@@ -514,31 +554,26 @@ class Request(object):
         self.stderr = OutputStream(conn, self, FCGI_STDERR)
         self.data = inputStreamClass(conn)
 
-
     def run(self):
         """Runs the handler, flushes the streams, and ends the request."""
 
         try:
             protocolStatus, appStatus = self.server.handler(self)
         except Exception as instance:
-            if FCGI_DEBUG:
-                logging.error(traceback.format_exc())
-            raise
-            # TODO: fix it
-            #self.stderr.flush()
-            #if not self.stdout.dataWritten:
-            #    self.server.error(self)
-            #protocolStatus, appStatus = FCGI_REQUEST_COMPLETE, 0
+            logging.exception(instance)  # just in case there's another error reporting the exception
+            # TODO: this appears to cause FCGI timeouts sometimes.  is it an exception loop?
+            self.stderr.flush()
+            if not self.stdout.dataWritten:
+                self.server.error(self)
+            protocolStatus, appStatus = FCGI_REQUEST_COMPLETE, 0
 
         if FCGI_DEBUG: logging.debug('protocolStatus = %d, appStatus = %d' % (protocolStatus, appStatus))
 
         self._flush()
         self._end(appStatus, protocolStatus)
 
-
-    def _end(self, appStatus=0, protocolStatus=FCGI_REQUEST_COMPLETE):
+    def _end(self, appStatus=long_int('0'), protocolStatus=FCGI_REQUEST_COMPLETE):
         self._conn.end_request(self, appStatus, protocolStatus)
-
 
     def _flush(self):
         self.stdout.flush()
@@ -565,7 +600,6 @@ class Connection(object):
         # Active Requests for this Connection, mapped by request ID.
         self._requests = {}
 
-
     def run(self):
         """Begin processing data from the socket."""
 
@@ -575,11 +609,10 @@ class Connection(object):
                 self.process_input()
             except KeyboardInterrupt:
                 break
-            #except EOFError, inst:
-            #    raise
-            #    if FCGI_DEBUG: logging.error(str(inst))
-            #    break
-
+                # except EOFError, inst:
+                #    raise
+                #    if FCGI_DEBUG: logging.error(str(inst))
+                #    break
 
     def process_input(self):
         """Attempt to read a single Record from the socket and process it."""
@@ -612,15 +645,13 @@ class Connection(object):
             # Need to complain about this.
             pass
 
-
     def writeRecord(self, rec):
         """
         Write a Record to the socket.
         """
         rec.write(self._stdout)
 
-
-    def end_request(self, req, appStatus=0, protocolStatus=FCGI_REQUEST_COMPLETE, remove=True):
+    def end_request(self, req, appStatus=long_int('0'), protocolStatus=FCGI_REQUEST_COMPLETE, remove=True):
         """
         End a Request.
 
@@ -653,7 +684,6 @@ class Connection(object):
             if FCGI_DEBUG: logging.debug('end_request: set _keepGoing = False')
             self._keepGoing = False
 
-
     def _do_get_values(self, inrec):
         """Handle an FCGI_GET_VALUES request from the web server."""
 
@@ -669,7 +699,6 @@ class Connection(object):
         outrec.contentLength = len(outrec.contentData)
         self.writeRecord(outrec)
 
-
     def _do_begin_request(self, inrec):
         """Handle an FCGI_BEGIN_REQUEST from the web server."""
         role, flags = struct.unpack(FCGI_BeginRequestBody, inrec.contentData)
@@ -680,10 +709,9 @@ class Connection(object):
 
         if not self._multiplexed and self._requests:
             # Can't multiplex requests.
-            self.end_request(req, 0, FCGI_CANT_MPX_CONN, remove=False)
+            self.end_request(req, long_int(0), FCGI_CANT_MPX_CONN, remove=False)
         else:
             self._requests[inrec.requestId] = req
-
 
     def _do_abort_request(self, inrec):
         """
@@ -695,12 +723,10 @@ class Connection(object):
         if req is not None:
             req.aborted = True
 
-
     def _start_request(self, req):
         """Run the request."""
         # Not multiplexed, so run it inline.
         req.run()
-
 
     def _do_params(self, inrec):
         """
@@ -717,7 +743,6 @@ class Connection(object):
                     pos, (name, value) = decode_pair(inrec.contentData, pos)
                     req.params[name] = value
 
-
     def _do_stdin(self, inrec):
         """Handle the FCGI_STDIN stream."""
         req = self._requests.get(inrec.requestId)
@@ -728,13 +753,11 @@ class Connection(object):
         else:
             self._start_request(req)
 
-
     def _do_data(self, inrec):
         """Handle the FCGI_DATA stream."""
         req = self._requests.get(inrec.requestId)
         if req is not None:
             req.data.add_data(inrec.contentData)
-
 
     def _do_unknown_type(self, inrec):
         """Handle an unknown request type. Respond accordingly."""
@@ -771,15 +794,17 @@ class FCGIServer(object):
         }
         self.app_root = app_root
 
-
     def run(self):
         msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
-        stdin = sys.stdin
-        stdout = os.fdopen(sys.stdin.fileno(), 'w', 0)
+        stdin = os.fdopen(sys.stdin.fileno(), 'rb', 0)
+        stdout = os.fdopen(sys.stdin.fileno(), 'wb', 0)
 
         conn = Connection(stdin, stdout, self)
-        conn.run()
-
+        try:
+            conn.run()
+        except Exception as e:
+            logging.exception(e)
+            raise
 
     def handler(self, req):
         """Special handler for WSGI."""
@@ -792,6 +817,7 @@ class FCGIServer(object):
 
         environ['wsgi.version'] = (1, 0)
         environ['wsgi.input'] = req.stdin
+        # TODO - sys.stderr appears to be None here?? (on Windows/IIS)
         stderr = TeeOutputStream((sys.stderr, req.stderr))
         environ['wsgi.errors'] = stderr
         environ['wsgi.multithread'] = False
@@ -810,7 +836,7 @@ class FCGIServer(object):
         result = None
 
         def write(data):
-            assert type(data) is str, 'write() argument must be string'
+            assert type(data) is bytes_type, 'write() argument must be bytes'
             assert headers_set, 'write() before start_response()'
 
             if not headers_sent:
@@ -831,7 +857,7 @@ class FCGIServer(object):
                 for header in responseHeaders:
                     s += '%s: %s\r\n' % header
                 s += '\r\n'
-                req.stdout.write(s)
+                req.stdout.write(s.encode(FCGI_CONTENT_ENCODING))
 
             req.stdout.write(data)
             req.stdout.flush()
@@ -843,7 +869,7 @@ class FCGIServer(object):
                         # Re-raise if too late
                         raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
                 finally:
-                    exc_info = None # avoid dangling circular ref
+                    exc_info = None  # avoid dangling circular ref
             else:
                 assert not headers_set, 'Headers already set!'
 
@@ -868,14 +894,14 @@ class FCGIServer(object):
                 try:
                     for data in result:
                         if data:
-                            write(data)
+                            write(make_bytes(data))
                     if not headers_sent:
-                        write('') # in case body was empty
+                        write(b'')  # in case body was empty
                 finally:
-                    #if hasattr(result, 'close'):
+                    # if hasattr(result, 'close'):
                     #    result.close()
                     pass
-            #except socket.error, e:
+            # except socket.error, e:
             #    if e[0] != errno.EPIPE:
             #        raise # Don't let EPIPE propagate beyond server
             except:
@@ -885,14 +911,13 @@ class FCGIServer(object):
 
         return FCGI_REQUEST_COMPLETE, 0
 
-
     def _sanitizeEnv(self, environ):
         """Ensure certain values are present, if required by WSGI."""
 
         if FCGI_DEBUG:
             logging.debug('raw envs: {0}'.format(environ))
 
-        #if not environ.has_key('SCRIPT_NAME'):
+        # if not environ.has_key('SCRIPT_NAME'):
         #    environ['SCRIPT_NAME'] = ''
         # TODO: fix for django
         environ['SCRIPT_NAME'] = ''
@@ -908,7 +933,7 @@ class FCGIServer(object):
                 environ['PATH_INFO'] = ''
 
         # convert %XX to python unicode
-        environ['PATH_INFO'] = urllib.parse.unquote(environ['PATH_INFO'])
+        environ['PATH_INFO'] = url_parse.unquote(environ['PATH_INFO'])
 
         # process app_root
         if self.app_root and environ['PATH_INFO'].startswith(self.app_root):
@@ -927,11 +952,11 @@ class FCGIServer(object):
                               ('SERVER_PORT', '80'),
                               ('SERVER_PROTOCOL', 'HTTP/1.0')]:
             if name not in environ:
-                environ['wsgi.errors'].write('%s: missing FastCGI param %s '
-                                             'required by WSGI!\n' %
-                                             (self.__class__.__name__, name))
-                environ[name] = default
+                message = '%s: missing FastCGI param %s required by WSGI!\n' % (
+                    self.__class__.__name__, name)
 
+                environ['wsgi.errors'].write(message.encode(FCGI_CONTENT_ENCODING))
+                environ[name] = default
 
     def error(self, req):
         """
@@ -941,11 +966,11 @@ class FCGIServer(object):
         if self.debug:
             import cgitb
 
-            req.stdout.write('Status: 500 Internal Server Error\r\n' +
-                             'Content-Type: text/html\r\n\r\n' +
-                             cgitb.html(sys.exc_info()))
+            req.stdout.write(b'Status: 500 Internal Server Error\r\n' +
+                             b'Content-Type: text/html\r\n\r\n' +
+                             cgitb.html(sys.exc_info()).encode(FCGI_CONTENT_ENCODING))
         else:
-            errorpage = """<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+            errorpage = b"""<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <html><head>
 <title>Unhandled Exception</title>
 </head><body>
@@ -953,8 +978,8 @@ class FCGIServer(object):
 <p>An unhandled exception was thrown by the application.</p>
 </body></html>
 """
-            req.stdout.write('Status: 500 Internal Server Error\r\n' +
-                             'Content-Type: text/html\r\n\r\n' +
+            req.stdout.write(b'Status: 500 Internal Server Error\r\n' +
+                             b'Content-Type: text/html\r\n\r\n' +
                              errorpage)
 
 
@@ -962,24 +987,19 @@ def example_application(environ, start_response):
     '''example wsgi app which outputs wsgi environment'''
     logging.debug('wsgi app started')
     data = ''
-    env_keys = list(environ.keys())
+    env_keys = environ.keys()
     env_keys.sort()
     for e in env_keys:
         data += '%s: %s\n' % (e, environ[e])
-    data += 'sys.version: '+sys.version+'\n'
-    start_response(
-        '200 OK',
-        [('Content-Type', 'text/plain'), ('Content-Length', str(len(data)))],
-    )
-    yield data
+    data += 'sys.version: ' + sys.version + '\n'
+    start_response('200 OK', [('Content-Type', 'text/plain'), ('Content-Length', str(len(data)))])
+    yield data.encode(FCGI_CONTENT_ENCODING)
 
 
 def run_example_app():
-    if FCGI_DEBUG:
-        logging.info('run_fcgi: STARTED')
+    if FCGI_DEBUG: logging.info('run_fcgi: STARTED')
     FCGIServer(example_application).run()
-    if FCGI_DEBUG:
-        logging.info('run_fcgi: EXITED')
+    if FCGI_DEBUG: logging.info('run_fcgi: EXITED')
 
 
 def run_django_app(django_settings_module, django_root):
@@ -994,8 +1014,7 @@ def run_django_app(django_settings_module, django_root):
         app_dir = os.path.dirname(app_path)
         if app_dir not in sys.path:
             sys.path.append(app_dir)
-            if FCGI_DEBUG:
-                logging.debug('%s added to PYTHONPATH' % app_dir)
+            if FCGI_DEBUG: logging.debug('%s added to PYTHONPATH' % app_dir)
 
         # cut .py extension in module
         if app_settings.endswith('.py'):
@@ -1008,14 +1027,13 @@ def run_django_app(django_settings_module, django_root):
         settings_module = django_settings_module
 
     os.environ['DJANGO_SETTINGS_MODULE'] = settings_module
-    if FCGI_DEBUG:
-        logging.info('DJANGO_SETTINGS_MODULE set to %s' % settings_module)
+    if FCGI_DEBUG: logging.info('DJANGO_SETTINGS_MODULE set to %s' % settings_module)
 
     try:
         from django.core.handlers.wsgi import WSGIHandler
     except ImportError:
-        if FCGI_DEBUG:
-            logging.error('Could not import django.core.handlers.wsgi module. Check that django is installed and in PYTHONPATH.')
+        if FCGI_DEBUG: logging.error(
+            'Could not import django.core.handlers.wsgi module. Check that django is installed and in PYTHONPATH.')
         raise
 
     FCGIServer(WSGIHandler(), app_root=django_root).run()
@@ -1026,45 +1044,48 @@ class Command(BaseCommand):
     help = '''Run as a fcgi server'''
 
     def handle(self, *args, **options):
-        django_root=args[0] if args else None
-
+        django_root = args[0] if args else None
         if FCGI_LOG:
             logging.basicConfig(
-                filename=os.path.join(FCGI_LOG_PATH, 'fcgi_%s_%d.log' %(datetime.datetime.now().strftime('%y%m%d_%H%M%S'), os.getpid())),
+                filename=os.path.join(FCGI_LOG_PATH, 'fcgi_%s_%d.log' % (
+                datetime.datetime.now().strftime('%y%m%d_%H%M%S'), os.getpid())),
                 filemode='w',
                 format='%(asctime)s [%(levelname)-5s] %(message)s',
-                level=logging.DEBUG,
-            )
-
+                level=logging.DEBUG)
         try:
             from django.core.handlers.wsgi import WSGIHandler
         except ImportError:
-            if FCGI_DEBUG:
-                logging.error('Could not import django.core.handlers.wsgi module. Check that django is installed and in PYTHONPATH.')
+            if FCGI_DEBUG: logging.error(
+                'Could not import django.core.handlers.wsgi module. Check that django is installed and in PYTHONPATH.')
             raise
-        FCGIServer(WSGIHandler(), app_root=django_root).run()
+
+        FCGIServer(WSGIHandler(), app_root=django_root, debug=settings.DEBUG).run()
 
 
 if __name__ == '__main__':
+
     # compile self
     compiled = os.path.split(__file__)[-1].replace('.py', '.pyc' if FCGI_DEBUG else '.pyo')
     if not os.path.exists(compiled):
         import py_compile
+
         try:
             py_compile.compile(__file__)
         except:
             pass
+
     # enable logging
     if FCGI_DEBUG:
         logging.basicConfig(
-            filename=os.path.join(FCGI_LOG_PATH, 'fcgi_%s_%d.log' %(datetime.datetime.now().strftime('%y%m%d_%H%M%S'), os.getpid())),
+            filename=os.path.join(FCGI_LOG_PATH,
+                                  'fcgi_%s_%d.log' % (datetime.datetime.now().strftime('%y%m%d_%H%M%S'), os.getpid())),
             filemode='w',
             format='%(asctime)s [%(levelname)-5s] %(message)s',
             level=logging.DEBUG)
 
     # If we are inside a subdirectory of a django app, set the default Djan
-    default_django_settings_module=None
-    parent_settings_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings/__init__.py')
+    default_django_settings_module = None
+    parent_settings_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.py')
     if os.path.exists(parent_settings_file):
         default_django_settings_module = os.path.abspath(parent_settings_file)
         if FCGI_DEBUG:
@@ -1074,11 +1095,13 @@ if __name__ == '__main__':
     # parse options
     usage = "usage: %prog [options]"
     parser = OptionParser(usage)
-    parser.add_option("", "--django-settings-module", dest="django_settings_module", help="python or physical path to Django settings module")
-    parser.add_option("", "--django-root", dest="django_root", help="strip this string from the front of any URLs before matching them against your URLconf patterns.")
+    parser.add_option("", "--django-settings-module", dest="django_settings_module",
+                      help="python or physical path to Django settings module")
+    parser.add_option("", "--django-root", dest="django_root",
+                      help="strip this string from the front of any URLs before matching them against your URLconf patterns.")
     parser.set_defaults(
-        django_settings_module = os.environ.get('DJANGO_SETTINGS_MODULE', default_django_settings_module),
-        django_root = os.environ.get('django.root', None)
+        django_settings_module=os.environ.get('DJANGO_SETTINGS_MODULE', default_django_settings_module),
+        django_root=os.environ.get('django.root', None)
     )
 
     (options, args) = parser.parse_args()
