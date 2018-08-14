@@ -14,7 +14,6 @@ ALLOWED_HOSTS = [
     SITE_DOMAIN_NAME,
 ]
 
-
 # Application definition
 INSTALLED_APPS = (
     # project
@@ -22,6 +21,7 @@ INSTALLED_APPS = (
 
     # django libs
     'django.contrib.gis',
+    'django.contrib.staticfiles',
 )
 
 MIDDLEWARE = (
@@ -30,9 +30,18 @@ MIDDLEWARE = (
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
 
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+        },
+    },
+]
+
 ROOT_URLCONF = 'snodas.urls'
 WSGI_APPLICATION = 'snodas.wsgi.application'
-
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -41,15 +50,12 @@ USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-
 # Django user model
 AUTH_USER_MODEL = 'auth.User'
-
 
 ## URL PATH SETTINGS
 # settings for rest framework
 REST_ROOT = ""
-
 
 STATIC_URL = '/static/'
 
@@ -67,7 +73,6 @@ STATICFILES_FINDERS = (
 MIGRATION_MODULES = {
     'sites': 'snodas.fixtures.sites_migrations',
 }
-
 
 # project-wide email settings
 EMAIL_SUBJECT_PREFIX = "[snodas] "

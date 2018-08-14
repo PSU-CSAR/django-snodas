@@ -4,7 +4,7 @@ from django.dispatch import receiver
 
 
 @receiver(connection_created, sender=PostgreSQLDatabaseWrapper)
-def db_connection_init(sender, connection):
+def db_connection_init(sender, connection, **kwargs):
     cmds = connection.settings_dict.get('CONNECTION_INIT', None)
 
     if cmds:
