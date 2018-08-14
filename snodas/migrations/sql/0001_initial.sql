@@ -348,10 +348,10 @@ BEGIN
           ) AS geom
         FROM (
           SELECT
-            id,
+            pourpoint_id,
             name,
             source,
-            ST_Transform(point, 3857) as geom
+            ST_Transform(point::geometry, 3857) as geom
           FROM pourpoint.pourpoint
           WHERE
             -- limit the points to only those that intersect the tile
@@ -374,7 +374,7 @@ BEGIN
           ) AS geom
           FROM (
             SELECT
-              id,
+              pourpoint_id,
               name,
               source,
               ST_Transform(
