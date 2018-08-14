@@ -18,4 +18,7 @@ def get_tile(request, zoom, x, y):
     if not tile:
         return HttpResponse(status=404)
 
-    return HttpResponse(tile[0], content_type='application/vnd.mapbox-vector-tile')
+    return HttpResponse(
+        bytes(tile[0]),
+        content_type='application/vnd.mapbox-vector-tile',
+    )

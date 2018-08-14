@@ -40,4 +40,4 @@ def get_tile(request, date, zoom, x, y, format):
     if not row:
         return HttpResponse(status=404)
 
-    return HttpResponse(row[0], content_type='application/{}'.format(format.lower))
+    return HttpResponse(bytes(row[0]), content_type='application/{}'.format(format.lower))
