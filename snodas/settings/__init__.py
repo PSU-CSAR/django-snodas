@@ -17,6 +17,7 @@ DATABASE_HOST = conf_settings.get('DATABASE_HOST', None)
 DATABASE_PORT = conf_settings.get('DATABASE_PORT', None)
 
 SITE_DOMAIN_NAME = conf_settings.get('SITE_DOMAIN_NAME', None)
+SUBDOMAINS = conf_settings.get('SUBDOMAINS', [])
 
 
 # SECURITY WARNING: don't run with debug turned on in production!

@@ -14,6 +14,8 @@ ALLOWED_HOSTS = [
     SITE_DOMAIN_NAME,
 ]
 
+ALLOWED_HOSTS += ['{}.{}'.format(sd, SITE_DOMAIN_NAME) for sd in SUBDOMAINS]
+
 # Application definition
 INSTALLED_APPS = (
     # project

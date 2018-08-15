@@ -369,6 +369,7 @@ class Install(object):
             'domain',
             input('Enter in the domain name for this project instance: '),
         )
+        settings['SUBDOMAINS'] = []
 
         settings['ADDITIONAL_SETTINGS_FILES'] = utils.get_default(
             options,
