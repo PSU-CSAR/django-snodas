@@ -300,7 +300,7 @@ CREATE TABLE pourpoint.pourpoint (
 
 CREATE TABLE pourpoint.tile (
   "tile" bytea NOT NULL,
-  "extent" geometry(POLYGON,3857),
+  "extent" geometry(POLYGON, 4326) NOT NULL,
   "x" integer NOT NULL CHECK (x >= 0),
   "y" integer NOT NULL CHECK (y >= 0),
   "zoom" smallint NOT NULL CHECK (zoom between 0 and 24),
@@ -322,6 +322,7 @@ AS $$
 DECLARE
   _q_tile bytea;
   _q_tile_ext geometry;
+  _q_tile_ext_buffer geometry;
 BEGIN
   SELECT
     tile
@@ -331,6 +332,14 @@ BEGIN
 
   IF _q_tile IS NULL THEN
     SELECT (_q_x, _q_y, _q_z)::tms_tilecoordz::geometry INTO _q_tile_ext;
+    SELECT ST_Transform(
+      ST_Expand(
+        _q_tile_ext,
+        (ST_XMax(box2d(_q_tile_ext)) / 4096) * 500,
+        (ST_YMax(box2d(_q_tile_ext)) / 4096) * 500
+      ),
+      4326
+    ) INTO _q_tile_ext_buffer;
     _q_tile := (SELECT (
       -- this first bit creates the points portion of the tile
       SELECT ST_AsMVT(points, 'points')
@@ -343,7 +352,7 @@ BEGIN
             geom,
             _q_tile_ext,
             4096,
-            100,
+            500,
             true
           ) AS geom
         FROM (
@@ -355,7 +364,7 @@ BEGIN
           FROM pourpoint.pourpoint
           WHERE
             -- limit the points to only those that intersect the tile
-            ST_Transform(_q_tile_ext, 4326) && point
+            ST_Intersects(_q_tile_ext_buffer, point)
         ) as point
       ) AS points) || (
       -- then we append the polygon portion of the tile
@@ -369,7 +378,7 @@ BEGIN
             geom,
             _q_tile_ext,
             4096,
-            100,
+            500,
             true
           ) AS geom
           FROM (
@@ -391,7 +400,7 @@ BEGIN
             WHERE
               -- limit the polygons to only those that intersect the tile
               polygon_simple is not Null AND
-              ST_Intersects(ST_Transform(_q_tile_ext, 4326), polygon_simple)
+              ST_Intersects(_q_tile_ext_buffer, polygon_simple)
           ) as poly
       ) AS polygons)
     );
@@ -405,7 +414,7 @@ BEGIN
       zoom
     ) VALUES (
       _q_tile,
-      _q_tile_ext,
+      _q_tile_ext_buffer,
       _q_x,
       _q_y,
       _q_z
@@ -422,9 +431,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql VOLATILE
 AS $$
 BEGIN
-  -- simplify then transform (less points for the transform)
-  NEW.polygon_simple =
-    ST_Transform(ST_SimplifyPreserveTopology(NEW.polygon, .001), 3857);
+  NEW.polygon_simple = ST_SimplifyPreserveTopology(NEW.polygon, .001);
   RETURN NEW;
 END;
 $$;
