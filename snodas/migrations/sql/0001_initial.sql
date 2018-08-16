@@ -213,7 +213,7 @@ BEGIN
   -- we try to get the x value and
   -- raster data for the requested tile
   SELECT x, rast
-  FROM snodas.raster_tiles
+  FROM snodas.tiles
   WHERE
       x = _q_coord.x AND
       y = _q_coord.y AND
@@ -228,7 +228,7 @@ BEGIN
   IF _q_rx IS NULL AND _q_resample THEN
     _q_outrast := _q_coord::raster;
     SELECT tms_copy_to_tile(ST_Resample(rast, _q_outrast), _q_outrast)
-    FROM snodas.raster_tiles
+    FROM snodas.tiles
     WHERE
       date = _q_date AND
       ST_Intersects(rast, _q_outrast)
@@ -243,7 +243,7 @@ BEGIN
     END IF;
 
     -- we save the generated tile for next time
-    INSERT INTO snodas.raster_tiles (
+    INSERT INTO snodas.tiles (
       rast,
       date,
       x,
