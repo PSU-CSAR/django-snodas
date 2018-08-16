@@ -323,6 +323,10 @@ DECLARE
   _q_tile bytea;
   _q_tile_ext geometry;
   _q_tile_ext_buffer geometry;
+  _q_tile_bbox box2d;
+  _q_tile_size integer := 4096;
+  _q_buffer integer := 256;
+  _q_simplify_tolerance integer := 1000;
 BEGIN
   SELECT
     tile
@@ -332,11 +336,12 @@ BEGIN
 
   IF _q_tile IS NULL THEN
     SELECT (_q_x, _q_y, _q_z)::tms_tilecoordz::geometry INTO _q_tile_ext;
+    SELECT box2d(_q_tile_ext) INTO _q_tile_bbox;
     SELECT ST_Transform(
       ST_Expand(
         _q_tile_ext,
-        (ST_XMax(box2d(_q_tile_ext)) / 4096) * 500,
-        (ST_YMax(box2d(_q_tile_ext)) / 4096) * 500
+        (ST_XMax(_q_tile_bbox) - ST_XMin(_q_tile_ext)) / _q_tile_size * _q_buffer,
+        (ST_YMax(_q_tile_bbox) - ST_YMin(_q_tile_bbox)) / _q_tile_size * _q_buffer
       ),
       4326
     ) INTO _q_tile_ext_buffer;
@@ -351,8 +356,8 @@ BEGIN
           ST_AsMVTGeom(
             geom,
             _q_tile_ext,
-            4096,
-            500,
+            _q_tile_size,
+            _q_buffer,
             true
           ) AS geom
         FROM (
@@ -377,8 +382,8 @@ BEGIN
           ST_AsMVTGeom(
             geom,
             _q_tile_ext,
-            4096,
-            500,
+            _q_tile_size,
+            _q_buffer,
             true
           ) AS geom
           FROM (
@@ -392,7 +397,7 @@ BEGIN
                 -- reduce the size of the generated tile
                 ST_SimplifyPreserveTopology(
                   polygon_simple,
-                  1000 / (2^_q_z * 4096)
+                  _q_simplify_tolerance / (2^_q_z * _q_tile_size)
                 ),
                 3857
               ) as geom
