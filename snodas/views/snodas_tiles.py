@@ -1,7 +1,11 @@
 import json
+import logging
 
 from django.db import connection
 from django.http import HttpResponse
+
+
+logger = logging.getLogger(__name__)
 
 
 def list_dates(request):
@@ -15,7 +19,7 @@ def list_dates(request):
     return HttpResponse(json.dumps(dates), content_type='application/json')
 
 
-def get_tile(request, date, zoom, x, y, format):
+def get_tile(request, year, month, day, zoom, x, y, format):
     if request.method != 'GET':
         return HttpResponse(reason="Not allowed", status=405)
 
@@ -33,11 +37,11 @@ def get_tile(request, date, zoom, x, y, format):
     with connection.cursor() as cursor:
         cursor.execute(
             query,
-            [x, y, zoom, date],
+            [x, y, zoom, '{}-{}-{}'.format(year, month, day)],
         )
         row = cursor.fetchone()
 
-    if not row:
+    if not row or not row[0]:
         return HttpResponse(status=404)
 
     return HttpResponse(bytes(row[0]), content_type='application/{}'.format(format.lower))

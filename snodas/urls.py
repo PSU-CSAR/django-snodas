@@ -7,7 +7,7 @@ from .views import snodas_tiles, pourpoint_tiles, snodas_stats
 
 rest_urls = [
     url(r"^tiles/$", snodas_tiles.list_dates),
-    url(r"^tiles/(?P<date>\d{4}-\d{2}-\d{2})/(?P<zoom>\d{1,2})/(?P<x>\d+)/(?P<y>\d+).(?P<format>png|jpg|jpeg)$", snodas_tiles.get_tile),
+    url(r"^tiles/(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})/(?P<zoom>\d{1,2})/(?P<x>\d+)/(?P<y>\d+).(?P<format>png|jpg|jpeg)$", snodas_tiles.get_tile),
     url(r"^pourpoints/(?P<zoom>\d{1,2})/(?P<x>\d+)/(?P<y>\d+).mvt$", pourpoint_tiles.get_tile),
     url(r"^query/(?P<start_year>\d{4})/(?P<end_year>\d{4})/(?P<month>\d{1,2})/(?P<day>\d{1,2})/$", snodas_stats.get_for_date),
     url(r"^query/(?P<start_year>\d{4})/(?P<end_year>\d{4})/(?P<doy>\d{1-3})/$", snodas_stats.get_for_doy),
