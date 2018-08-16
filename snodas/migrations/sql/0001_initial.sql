@@ -282,7 +282,7 @@ CREATE TABLE pourpoint.pourpoint (
   "name" text NOT NULL,
   "awdb_id" text,
   "source" pourpoint.source NOT NULL,
-  "point" geography(Point, 4326) NOT NULL,
+  "point" geometry(Point, 4326) NOT NULL,
   "polygon" geometry,
   "polygon_simple" geometry,
   "area_meters" float,
@@ -322,6 +322,7 @@ AS $$
 DECLARE
   _q_tile bytea;
   _q_tile_ext geometry;
+  _q_tile_ext_4326 geometry;
   _q_tile_ext_buffer geometry;
   _q_tile_bbox box2d;
   _q_tile_size integer := 4096;
@@ -336,14 +337,12 @@ BEGIN
 
   IF _q_tile IS NULL THEN
     SELECT (_q_x, _q_y, _q_z)::tms_tilecoordz::geometry INTO _q_tile_ext;
-    SELECT box2d(_q_tile_ext) INTO _q_tile_bbox;
-    SELECT ST_Transform(
-      ST_Expand(
-        _q_tile_ext,
-        (ST_XMax(_q_tile_bbox) - ST_XMin(_q_tile_ext)) / _q_tile_size * _q_buffer,
-        (ST_YMax(_q_tile_bbox) - ST_YMin(_q_tile_bbox)) / _q_tile_size * _q_buffer
-      ),
-      4326
+    SELECT ST_Transform((_q_x, _q_y, _q_z)::tms_tilecoordz::geometry, 4326) INTO _q_tile_ext_4326;
+    SELECT box2d(_q_tile_ext_4326) INTO _q_tile_bbox;
+    SELECT ST_Expand(
+      _q_tile_ext_4326,
+      (ST_XMax(_q_tile_bbox) - ST_XMin(_q_tile_bbox)) / _q_tile_size * _q_buffer,
+      (ST_YMax(_q_tile_bbox) - ST_YMin(_q_tile_bbox)) / _q_tile_size * _q_buffer
     ) INTO _q_tile_ext_buffer;
     _q_tile := (SELECT (
       -- this first bit creates the points portion of the tile
@@ -365,7 +364,7 @@ BEGIN
             pourpoint_id,
             name,
             source,
-            ST_Transform(point::geometry, 3857) as geom
+            ST_Transform(point, 3857) as geom
           FROM pourpoint.pourpoint
           WHERE
             -- limit the points to only those that intersect the tile
