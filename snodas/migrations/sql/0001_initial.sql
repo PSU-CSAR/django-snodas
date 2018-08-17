@@ -116,7 +116,7 @@ CREATE TABLE snodas.tiles (
   "rast" raster,
   "x" integer NOT NULL CHECK (x >= 0),
   "y" integer NOT NULL CHECK (y >= 0),
-  "zoom" smallint NOT NULL CHECK (zoom between 0 and 20),
+  "zoom" smallint NOT NULL CHECK (zoom between 0 and 15),
   PRIMARY KEY (date, x, y, zoom),
   CONSTRAINT enforce_height_rast CHECK (st_height(rast) = 256),
   CONSTRAINT enforce_num_bands_rast CHECK (st_numbands(rast) = 1),
@@ -210,6 +210,13 @@ DECLARE
   _q_rx integer;
   _q_outrast raster;
 BEGIN
+  -- we don't need to do anything if the
+  -- zoom level greater than that supported
+  -- by our snodas tiles
+  IF _q_coord.z > 15 THEN
+    RETURN NULL;
+  END IF;
+
   -- we try to get the x value and
   -- raster data for the requested tile
   SELECT x, rast
@@ -226,6 +233,14 @@ BEGIN
   -- if the tile x is null then we don't have that tile
   -- so we can resample to create a new one, if requested
   IF _q_rx IS NULL AND _q_resample THEN
+    -- we tile zoom 0-7 when we get a raster, and we can't
+    -- generate lower tiles on the fly anyway, so we just
+    -- return early if the tile is null and the zoom <= 7
+    IF _q_coord.z <= 7 THEN
+      RETURN NULL;
+    END IF;
+
+    -- let's try to create the requested tile
     _q_outrast := _q_coord::raster;
     SELECT tms_copy_to_tile(ST_Resample(rast, _q_outrast), _q_outrast)
     FROM snodas.tiles
