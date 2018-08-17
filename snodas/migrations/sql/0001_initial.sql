@@ -219,13 +219,12 @@ BEGIN
 
   -- we try to get the x value and
   -- raster data for the requested tile
-  SELECT x, rast
-  FROM snodas.tiles
+  SELECT x, rast FROM snodas.tiles
   WHERE
-      x = _q_coord.x AND
-      y = _q_coord.y AND
-      zoom = _q_coord.z AND
-      date = _q_date
+    x = _q_coord.x AND
+    y = _q_coord.y AND
+    zoom = _q_coord.z AND
+    date = _q_date
   INTO _q_rx, _q_tile;
 
   -- seems kinda weird, but we can tell if we selected a
@@ -243,8 +242,7 @@ BEGIN
     -- let's try to create the requested tile
     _q_outrast := _q_coord::raster;
     SELECT tms_copy_to_tile(ST_Resample(rast, _q_outrast), _q_outrast)
-    FROM snodas.tiles
-    WHERE
+    FROM snodas.tiles WHERE
       date = _q_date AND
       ST_Covers(rast, _q_outrast)
     ORDER BY zoom DESC
@@ -258,19 +256,14 @@ BEGIN
     END IF;
 
     -- we save the generated tile for next time
-    INSERT INTO snodas.tiles (
-      rast,
-      date,
-      x,
-      y,
-      zoom
-    ) VALUES (
-      _q_tile,
-      _q_date,
-      _q_coord.x,
-      _q_coord.y,
-      _q_coord.z
-    );
+    BEGIN
+      INSERT INTO snodas.tiles (rast, date, x, y, zoom) VALUES (
+        _q_tile, _q_date, _q_coord.x, _q_coord.y, _q_coord.z
+      );
+    EXCEPTION WHEN unique_violation THEN
+      -- looks like someone beat us to the insert
+      -- guess we'll just return this one and move on
+    END;
   END IF;
 
   -- if the tile is null, either from the initial
@@ -344,10 +337,7 @@ DECLARE
   _q_buffer integer := 256;
   _q_simplify_tolerance integer := 1000;
 BEGIN
-  SELECT
-    tile
-  FROM
-    pourpoint.tile
+  SELECT tile FROM pourpoint.tile
   WHERE x = _q_x AND y = _q_y AND zoom = _q_z INTO _q_tile;
 
   IF _q_tile IS NULL THEN
@@ -359,6 +349,8 @@ BEGIN
       (ST_XMax(_q_tile_bbox) - ST_XMin(_q_tile_bbox)) / _q_tile_size * _q_buffer,
       (ST_YMax(_q_tile_bbox) - ST_YMin(_q_tile_bbox)) / _q_tile_size * _q_buffer
     ) INTO _q_tile_ext_buffer;
+
+    -- now we make the tile
     _q_tile := (SELECT (
       -- this first bit creates the points portion of the tile
       SELECT ST_AsMVT(points, 'points')
@@ -382,7 +374,7 @@ BEGIN
             ST_Transform(point, 3857) as geom
           FROM pourpoint.pourpoint
           WHERE
-            -- limit the points to only those that intersect the tile
+            -- limit the points to only those that intersect the buffer
             ST_Intersects(_q_tile_ext_buffer, point)
         ) as point
       ) AS points) || (
@@ -417,7 +409,7 @@ BEGIN
               ) as geom
             FROM pourpoint.pourpoint
             WHERE
-              -- limit the polygons to only those that intersect the tile
+              -- limit the polygons to only those that intersect the buffer
               polygon_simple is not Null AND
               ST_Intersects(_q_tile_ext_buffer, polygon_simple)
           ) as poly
@@ -425,19 +417,14 @@ BEGIN
     );
 
     -- we save the generated tile for next time
-    INSERT INTO pourpoint.tile (
-      tile,
-      extent,
-      x,
-      y,
-      zoom
-    ) VALUES (
-      _q_tile,
-      _q_tile_ext_buffer,
-      _q_x,
-      _q_y,
-      _q_z
-    );
+    BEGIN
+      INSERT INTO pourpoint.tile (tile, extent, x, y, zoom)
+      VALUES (_q_tile, _q_tile_ext_buffer, _q_x, _q_y, _q_z);
+    EXCEPTION WHEN unique_violation THEN
+      -- guess someone beat us to the punch
+      -- oh well, we made a tile special for one use
+      -- let's return it and maybe they won't notice
+    END;
   END IF;
 
   RETURN _q_tile;
