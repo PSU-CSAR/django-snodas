@@ -231,7 +231,7 @@ BEGIN
     FROM snodas.tiles
     WHERE
       date = _q_date AND
-      ST_Intersects(rast, _q_outrast)
+      ST_Covers(rast, _q_outrast)
     ORDER BY zoom DESC
     LIMIT 1
     INTO _q_tile;
