@@ -8,6 +8,18 @@ from django.http import HttpResponse
 logger = logging.getLogger(__name__)
 
 
+EMPTY_PNG = (
+    b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00\x08'
+    b'\x00\x00\x00\x00y\x19\xf7\xba\x00\x00\x00\x02tRNS\x00\x00v\x93\xcd8\x00'
+    b'\x00\x00TIDATx\x9c\xed\xc1\x01\x01\x00\x00\x00\x80\x90\xfe\xaf\xee\x08'
+    b'\n\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+    b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+    b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+    b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x18\x01\x0f\x00\x01M\xf6\xca'
+    b'\x06\x00\x00\x00\x00IEND\xaeB`\x82'
+)
+
+
 def list_dates(request):
     if request.method != 'GET':
         return HttpResponse(reason="Not allowed", status=405)
@@ -32,7 +44,8 @@ def get_tile(request, year, month, day, zoom, x, y, format):
     options = "ARRAY['']"
 
     # TODO: option for resample true/false (currently always false)
-    query = 'SELECT snodas.tile2png((%s, %s, %s)::tms_tilecoordz, %s::date, false)'
+    query = \
+        'SELECT snodas.tile2png((%s, %s, %s)::tms_tilecoordz, %s::date, true)'
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -42,6 +55,11 @@ def get_tile(request, year, month, day, zoom, x, y, format):
         row = cursor.fetchone()
 
     if not row or not row[0]:
-        return HttpResponse(status=404)
+        png = EMPTY_PNG
+    else:
+        png = row[0]
 
-    return HttpResponse(bytes(row[0]), content_type='application/{}'.format(format.lower))
+    return HttpResponse(
+        bytes(png),
+        content_type='application/{}'.format(format.lower),
+    )
