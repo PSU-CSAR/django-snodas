@@ -5,10 +5,12 @@ import glob
 import tarfile
 import shutil
 
+from io import StringIO, BytesIO
 from datetime import datetime
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
+from django.conf import settings
 
 from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.db.backends.postgis.pgraster import to_pgraster
@@ -16,7 +18,7 @@ from django.contrib.gis.db.backends.postgis.pgraster import to_pgraster
 from ...exceptions import SNODASError
 from ...utils.filesystem import tempdirectory
 
-from ..utils import to_namedtuple, FullPaths, is_file
+from ..utils import to_namedtuple, FullPaths, is_file, is_dir, chain_streams
 
 
 class Command(BaseCommand):
@@ -27,27 +29,18 @@ class Command(BaseCommand):
     requires_system_checks = False
     can_import_settings = True
 
-    sql = '''INSERT INTO snodas.raster (
-    swe,
-    depth,
-    runoff,
-    sublimation,
-    sublimation_blowing,
-    precip_solid,
-    precip_liquid,
-    average_temp,
-    date
-) VALUES (
-    %s,
-    %s,
-    %s,
-    %s,
-    %s,
-    %s,
-    %s,
-    %s,
-    %s
-)'''
+    table = 'snodas.raster'
+    cols = [
+        'swe',
+        'depth',
+        'runoff',
+        'sublimation',
+        'sublimation_blowing',
+        'precip_solid',
+        'precip_liquid',
+        'average_temp',
+        'date',
+    ]
 
     def add_arguments(self, parser):
         super(Command, self).add_arguments(parser)
@@ -57,33 +50,51 @@ class Command(BaseCommand):
             type=is_file,
             help='Path to a SNODAS tarfile.',
         )
+        parser.add_argument(
+            '-o',
+            '--output-dir',
+            action=FullPaths,
+            type=is_dir,
+            help=('Path to a directory in which to retain the expanded files. '
+                  'Default is to use a temp directory deleted on exit.'),
+        )
 
     def handle(self, *args, **options):
-        rasters = self.extract_snodas_data(options['snodas_tar'])
+        if settings.DEBUG:
+            raise CommandError(
+               'Debug logging can cause problems for loadraster. '
+               'Turn off DEBUG before running loadraster.'
+            )
+        rasters = self.extract_snodas_data(
+            options['snodas_tar'],
+            outdir=options.get('output_dir', None),
+        )
         date = self.validate_raster_dates(rasters)
 
+        ftype = chain_streams(
+            [
+                rasters['swe']['raster'],
+                rasters['depth']['raster'],
+                rasters['runoff']['raster'],
+                rasters['sublimation']['raster'],
+                rasters['sublimation_blowing']['raster'],
+                rasters['precip_solid']['raster'],
+                rasters['precip_liquid']['raster'],
+                rasters['average_temp']['raster'],
+                BytesIO(date.encode()),
+            ],
+            sep=b'\t',
+        )
+
         print('Inserting record into database')
-        connection.prepare_database()
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    self.sql,
-                    [
-                        rasters['swe']['raster'],
-                        rasters['depth']['raster'],
-                        rasters['runoff']['raster'],
-                        rasters['sublimation']['raster'],
-                        rasters['sublimation_blowing']['raster'],
-                        rasters['precip_solid']['raster'],
-                        rasters['precip_liquid']['raster'],
-                        rasters['average_temp']['raster'],
-                        date,
-                    ],
+        with connection.cursor() as cursor:
+            try:
+                cursor.copy_from(ftype, self.table)
+                del rasters
+            except KeyError as e:
+                raise SNODASError(
+                    'SNODAS data appears incomplete: {}'.format(str(e)),
                 )
-        except KeyError as e:
-            raise SNODASError(
-                'SNODAS data appears incomplete: {}'.format(str(e)),
-            )
 
         print('Processing completed successfully')
 
@@ -118,7 +129,6 @@ class Command(BaseCommand):
             raise SNODASError('Filename could not be parsed: {}'.format(name))
 
         info['product_code'] = int(info['product_code'])
-        info['date'] = datetime.strptime(info['date'], '%Y%m%d')
         info['name'] = name
         return to_namedtuple(info)
 
@@ -156,9 +166,11 @@ class Command(BaseCommand):
         with open(hdr, 'w') as f:
             f.writelines(lines)
 
-    def extract_snodas_data(self, snodas_tar):
+    def extract_snodas_data(self, snodas_tar, outdir=None):
         rasters = {}
         with tempdirectory() as temp:
+            if not outdir:
+                outdir = temp
             tar = tarfile.open(snodas_tar)
             print('Extracting {}\n\tto temp dir {}'.format(snodas_tar, temp))
             tar.extractall(temp)
@@ -172,11 +184,15 @@ class Command(BaseCommand):
                         os.path.basename(f),
                     ),
                 )
+                outpath = os.path.join(
+                    outdir,
+                    os.path.splitext(os.path.basename(f))[0],
+                )
                 with gzip.open(f, 'rb') as f_in, \
-                        open(os.path.splitext(f)[0], 'wb') as f_out:
+                        open(outpath, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
 
-            hdrs = glob.glob(os.path.join(temp, '*.Hdr'))
+            hdrs = glob.glob(os.path.join(outdir, '*.Hdr'))
             for idx, hdr in enumerate(hdrs, start=1):
                 print(
                     'Importing {} of {}: {}'.format(
@@ -188,7 +204,7 @@ class Command(BaseCommand):
                 self.trim_header(hdr)
                 file_info = self.parse_filename(hdr)
                 rasters[self.snodas_type_from_file_info(file_info)] = {
-                    'raster': to_pgraster(GDALRaster(hdr)),
+                    'raster': BytesIO(to_pgraster(GDALRaster(hdr)).encode()),
                     'info': file_info
                 }
         return rasters
