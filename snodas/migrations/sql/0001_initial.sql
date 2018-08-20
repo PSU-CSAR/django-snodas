@@ -161,6 +161,34 @@ END;
 $$;
 
 
+CREATE OR REPLACE FUNCTION snodas.make_tiles(
+  _date date,
+  _zoom integer
+)
+RETURNS void
+LANGUAGE plpgsql VOLATILE
+AS $$
+BEGIN
+  -- clean out old tiles in case we are rebuilding
+  DELETE FROM snodas.tiles WHERE date = _date and zoom = _zoom;
+
+  -- create the tiles
+  INSERT INTO snodas.tiles
+    (date, rast, x, y, zoom)
+  SELECT
+    r.date, t.rast, t.x, t.y, t.z
+  FROM
+    snodas.raster as r,
+  LATERAL
+    tms_tile_raster_to_zoom(
+      snodas.reclass_and_warp(r.swe),
+      _zoom
+  ) AS t
+  WHERE r.date = _date;
+END;
+$$;
+
+
 CREATE OR REPLACE FUNCTION snodas.make_tiles()
 RETURNS TRIGGER
 LANGUAGE plpgsql VOLATILE
