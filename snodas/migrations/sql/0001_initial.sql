@@ -673,7 +673,11 @@ BEGIN
     -- average_temp (kelvin):
     -- average of all cells with data in both rasters
     -- scale factor 1
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.average_temp, '[rast2]', '64BF', 'FIRST'))).mean
+    CASE s.average_temp
+      WHEN NULL THEN NULL
+      ELSE
+        (ST_SummaryStats(ST_MapAlgebra(p.rast, s.average_temp, '[rast2]', '64BF', 'FIRST'))).mean
+    END
   );
 END;
 $$;
@@ -744,7 +748,11 @@ BEGIN
     -- temperature in kelvin times intersected area of each pixel (weight)
     -- divided by the total pourpoint area to find average
     -- scale factor 1
-    (ST_SummaryStats(ST_MapAlgebra(p.rast, s.average_temp, '[rast1] * [rast2]', '64BF', 'FIRST'))).sum / p.area_meters
+    CASE s.average_temp
+      WHEN NULL THEN NULL
+      ELSE
+        (ST_SummaryStats(ST_MapAlgebra(p.rast, s.average_temp, '[rast1] * [rast2]', '64BF', 'FIRST'))).sum / p.area_meters
+    END
   );
 END;
 $$;
