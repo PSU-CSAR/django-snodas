@@ -21,6 +21,9 @@ from ...utils.filesystem import tempdirectory
 from ..utils import to_namedtuple, FullPaths, is_file, is_dir, chain_streams
 
 
+AVERAGE_TEMP_REQUIRED = True
+
+
 class Command(BaseCommand):
     help = """Load a SNODAS rasters into the database.
     Simply provide the path to a SNODAS daily tarfile
@@ -71,8 +74,7 @@ class Command(BaseCommand):
         )
         date = self.validate_raster_dates(rasters)
 
-        ftype = chain_streams(
-            [
+        raster_streams = [
                 rasters['swe']['raster'],
                 rasters['depth']['raster'],
                 rasters['runoff']['raster'],
@@ -80,11 +82,22 @@ class Command(BaseCommand):
                 rasters['sublimation_blowing']['raster'],
                 rasters['precip_solid']['raster'],
                 rasters['precip_liquid']['raster'],
-                rasters['average_temp']['raster'],
-                BytesIO(date.encode()),
-            ],
-            sep=b'\t',
-        )
+        ]
+
+        try:
+            raster_streams.append(rasters['average_temp']['raster'])
+        except KeyError as e:
+            # early data has aerage temp missing,
+            # (and also has a funky undocumented grid)
+            # but all modern data should have it
+            # we have a hard override just for
+            # this weird histroical accident
+            if AVERAGE_TEMP_REQUIRED:
+                raise
+            raster_streams.append(BytesIO(b'\N'))
+
+        raster_streams.append(BytesIO(date.encode()))
+        ftype = chain_streams(raster_streams, sep=b'\t')
 
         print('Inserting record into database')
         with connection.cursor() as cursor:
