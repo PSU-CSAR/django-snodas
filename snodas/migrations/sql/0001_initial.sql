@@ -626,6 +626,12 @@ BEGIN
       USING HINT = 'Make sure you call pourpoint.calc_stats_1 with a valid pourpoint raster for the SNODAS date.';
   END IF;
 
+  IF NOT ST_SameAlignment(p.rast, s.swe) THEN
+      RAISE WARNING '%', ST_NotSameAlignmentReason(p.rast, s.swe);
+      RAISE WARNING '%', ST_Georeference(p.rast);
+      RAISE WARNING '%', ST_Georeference(s.swe);
+  END IF;
+
   RETURN (
     p.rasterized_id,
     p.pourpoint_id,
@@ -698,6 +704,12 @@ BEGIN
         s.date,
         p.valid_dates
       USING HINT = 'Make sure you call pourpoint.calc_stats_2 with a valid pourpoint raster for the SNODAS date.';
+  END IF;
+
+  IF NOT ST_SameAlignment(p.rast, s.swe) THEN
+      RAISE WARNING '%', ST_NotSameAlignmentReason(p.rast, s.swe);
+      RAISE WARNING '%', ST_Georeference(p.rast);
+      RAISE WARNING '%', ST_Georeference(s.swe);
   END IF;
 
   RETURN (SELECT
