@@ -379,35 +379,8 @@ BEGIN
     ) INTO _q_tile_ext_buffer;
 
     -- now we make the tile
-    _q_tile := (SELECT (
-      -- this first bit creates the points portion of the tile
-      SELECT ST_AsMVT(points, 'points')
-      FROM (
-        SELECT
-          pourpoint_id,
-          name,
-          source,
-          ST_AsMVTGeom(
-            geom,
-            _q_tile_ext,
-            _q_tile_size,
-            _q_buffer,
-            true
-          ) AS geom
-        FROM (
-          SELECT
-            pourpoint_id,
-            name,
-            source,
-            ST_Transform(point, 3857) as geom
-          FROM pourpoint.pourpoint
-          WHERE
-            -- limit the points to only those that intersect the buffer
-            ST_Intersects(_q_tile_ext_buffer, point)
-        ) as point
-      ) AS points) || (
-      -- then we append the polygon portion of the tile
-      SELECT ST_AsMVT(polygons, 'polygons')
+    _q_tile := (
+      SELECT ST_AsMVT(polygons, 'watersheds')
       FROM (
         SELECT
           pourpoint_id,
@@ -440,8 +413,9 @@ BEGIN
               -- limit the polygons to only those that intersect the buffer
               polygon_simple is not Null AND
               ST_Intersects(_q_tile_ext_buffer, polygon_simple)
+            ORDER BY area_meters
           ) as poly
-      ) AS polygons)
+      ) AS polygons
     );
 
     -- we save the generated tile for next time
@@ -478,9 +452,7 @@ BEGIN
   -- clean out old tiles when pourpoint data changes
   DELETE FROM pourpoint.tile WHERE (
     ST_Intersects(extent, OLD.polygon_simple) OR
-    ST_Intersects(extent, NEW.polygon_simple) OR
-    ST_Intersects(extent, OLD.point) OR
-    ST_Intersects(extent, NEW.point)
+    ST_Intersects(extent, NEW.polygon_simple)
   );
   RETURN NULL;
 END;
@@ -518,12 +490,11 @@ CREATE TRIGGER pourpoint_bust_cache_trigger
 AFTER INSERT OR DELETE ON pourpoint.pourpoint
 FOR EACH ROW EXECUTE PROCEDURE pourpoint.bust_cache();
 
--- updated pourpoint changes tiles when either
--- the point or simplified polygon are changed
+-- updated pourpoint changes tiles when
+-- the simplified polygon is changed
 CREATE TRIGGER pourpoint_update_bust_cache_trigger
 AFTER UPDATE ON pourpoint.pourpoint
 FOR EACH ROW WHEN (
-  OLD.point IS DISTINCT FROM NEW.point OR
   OLD.polygon_simple IS DISTINCT FROM NEW.polygon_simple
 ) EXECUTE PROCEDURE pourpoint.bust_cache();
 
