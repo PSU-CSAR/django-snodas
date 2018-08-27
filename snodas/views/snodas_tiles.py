@@ -25,7 +25,7 @@ def list_dates(request):
         return HttpResponse(reason="Not allowed", status=405)
 
     with connection.cursor() as cursor:
-        cursor.execute('SELECT date FROM snodas.raster')
+        cursor.execute('SELECT date FROM snodas.raster ORDER BY date')
         dates = [str(date[0]) for date in cursor.fetchall()]
 
     return HttpResponse(json.dumps(dates), content_type='application/json')
