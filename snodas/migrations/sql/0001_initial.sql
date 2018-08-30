@@ -385,6 +385,7 @@ BEGIN
         SELECT
           pourpoint_id,
           name,
+          awdb_id,
           source,
           ST_AsMVTGeom(
             geom,
@@ -397,6 +398,7 @@ BEGIN
             SELECT
               pourpoint_id,
               name,
+              awdb_id,
               source,
               ST_Transform(
                 -- we simplify according to the zoom
