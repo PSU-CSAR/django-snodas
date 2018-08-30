@@ -25,10 +25,45 @@ def list_dates(request):
         return HttpResponse(reason="Not allowed", status=405)
 
     with connection.cursor() as cursor:
-        cursor.execute('SELECT date FROM snodas.raster ORDER BY date')
+        cursor.execute('SELECT date FROM snodas.raster ORDER BY date DESC')
         dates = [str(date[0]) for date in cursor.fetchall()]
 
     return HttpResponse(json.dumps(dates), content_type='application/json')
+
+
+# TODO: clean this up because it did not help anything
+def date_params(request):
+    if request.method != 'GET':
+        return HttpResponse(reason="Not allowed", status=405)
+
+    query = '''WITH start_end as (
+  SELECT
+    MIN(date) as start_date,
+    MAX(date) as end_date
+  FROM
+    snodas.raster
+)
+SELECT row_to_json(t)::text
+FROM (
+  SELECT
+    (SELECT start_end.start_date::text as start_date FROM start_end),
+    (SELECT start_end.end_date::text as end_date FROM start_end),
+    json_agg(missing::date::text) as missing
+  FROM
+    generate_series(
+      (SELECT start_date FROM start_end),
+      (SELECT end_date FROM start_end),
+      interval '1 day'
+    ) AS missing
+  WHERE
+    missing NOT IN (SELECT date FROM snodas.raster)
+) as t'''
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        dates = cursor.fetchone()
+
+    return HttpResponse(dates, content_type='application/json')
 
 
 def get_tile(request, year, month, day, zoom, x, y, format):
