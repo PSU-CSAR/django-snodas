@@ -273,7 +273,14 @@ BEGIN
     FROM snodas.tiles WHERE
       date = _q_date AND
       zoom >= 7 AND
-      ST_Covers(rast, _q_outrast)
+      ST_Covers(
+        -- we specifically take the geometry here and don't
+        -- use the raster at all because something causes a
+        -- rounding error and then covers says child tiles
+        -- don't have a parent when they actually do
+        (x, y, zoom)::tms_tilecoordz::geometry,
+        _q_coord::geometry
+      )
     INTO _q_tile;
 
     -- if the generated tile has no data then we just set it
