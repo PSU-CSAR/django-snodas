@@ -269,12 +269,11 @@ BEGIN
 
     -- let's try to create the requested tile
     _q_outrast := _q_coord::raster;
-    SELECT tms_copy_to_tile(ST_Resample(rast, _q_outrast), _q_outrast)
+    SELECT tms_copy_to_tile(rast, _q_outrast)
     FROM snodas.tiles WHERE
       date = _q_date AND
+      zoom >= 7 AND
       ST_Covers(rast, _q_outrast)
-    ORDER BY zoom DESC
-    LIMIT 1
     INTO _q_tile;
 
     -- if the generated tile has no data then we just set it
