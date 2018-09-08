@@ -66,7 +66,7 @@ FROM (
     return HttpResponse(dates, content_type='application/json')
 
 
-def get_tile(request, year, month, day, zoom, x, y, format):
+def get_tile(request, date, zoom, x, y, format):
     if request.method != 'GET':
         return HttpResponse(reason="Not allowed", status=405)
 
@@ -85,7 +85,7 @@ def get_tile(request, year, month, day, zoom, x, y, format):
     with connection.cursor() as cursor:
         cursor.execute(
             query,
-            [x, y, zoom, '{}-{}-{}'.format(year, month, day)],
+            [x, y, zoom, date],
         )
         row = cursor.fetchone()
 
