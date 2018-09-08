@@ -67,7 +67,9 @@ FROM
   pourpoint.statistics
 WHERE
   pourpoint_id = {} AND
-  {}::daterange @> date'''
+  {}::daterange @> date
+ORDER BY
+  date'''
 
     daterange = '[{}, {}]'.format(start_date, end_date)
     stat_query = sql.SQL(stat_query).format(sql.Literal(pourpoint_id), sql.Literal(daterange))
