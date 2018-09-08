@@ -1,8 +1,13 @@
 import json
 
+from io import BytesIO
+
+from psycopg2 import sql
+
 from django.db import connection
 from django.http import HttpResponse
 
+from ..utils.http import stream_file
 from ..exceptions import GeoJSONValidationError
 
 
@@ -22,6 +27,65 @@ def validate_geojson(geom):
             'GeoJSON appears to be invalid',
         )
     return geom
+
+
+def raw_stat_query(request, cursor, filename, stat_query):
+    flike = BytesIO()
+    csvquery = "COPY ({}) TO STDOUT WITH CSV HEADER".format(stat_query.as_string(cursor.connection))
+    cursor.copy_expert(csvquery, flike)
+
+    return stream_file(
+        flike,
+        filename,
+        request,
+        'text/csv',
+    )
+
+
+def get_raw_statistics_pourpoint(request, pourpoint_id, start_date, end_date):
+    if request.method != 'GET':
+        return HttpResponse(reason="Not allowed", status=405)
+
+    pp_query = '''SELECT
+  name
+FROM
+  pourpoint.pourpoint
+WHERE
+  pourpoint_id = %s'''
+
+    stat_query = '''SELECT
+  date,
+  depth,
+  swe,
+  runoff,
+  sublimation,
+  sublimation_blowing,
+  precip_solid,
+  precip_liquid,
+  average_temp
+FROM
+  pourpoint.statistics
+WHERE
+  pourpoint_id = {} AND
+  {}::daterange @> date'''
+
+    daterange = '[{}, {}]'.format(start_date, end_date)
+    stat_query = sql.SQL(stat_query).format(sql.Literal(pourpoint_id), sql.Literal(daterange))
+
+    with connection.cursor() as cursor:
+        cursor.execute(pp_query, [pourpoint_id])
+        pp = cursor.fetchone()
+
+        if not pp:
+            return HttpResponse(status=404)
+
+        pp_name = '{}_{}-{}.csv'.format(
+            "-".join(pp[0].split()),
+            start_date,
+            end_date,
+        )
+
+        return raw_stat_query(request, cursor, pp_name, stat_query)
 
 
 def get_for_date(request, start_year, end_year, month, day):

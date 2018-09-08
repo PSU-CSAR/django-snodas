@@ -13,6 +13,7 @@ YYYYMMDD = r'{YYYY}{MM}{DD}'.format(YYYY=YYYY, MM=MM, DD=DD)
 ZOOM = r'[0]?[1-9]|1[0-5]'
 X = r'\d+'
 Y = r'\d+'
+ID = r'\d+'
 
 rest_urls = [
     url(
@@ -43,6 +44,13 @@ rest_urls = [
             Y=Y,
         ),
         pourpoints.get_tile,
+    ),
+    url(
+        r'^query/(?P<pourpoint_id>{ID})/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
+            ID=ID,
+            DATE=YYYYMMDD,
+        ),
+    snodas_stats.get_raw_statistics_pourpoint,
     ),
     url(
         r"^query/(?P<start_year>{Y})/(?P<end_year>{Y})/(?P<month>{M})/(?P<day>{D})/$".format(
