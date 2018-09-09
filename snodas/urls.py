@@ -5,6 +5,8 @@ from .settings import REST_ROOT, DEBUG, INSTALLED_APPS
 from .views import snodas_tiles, pourpoints, snodas_stats
 
 
+# TODO: change these to be django url convertors
+# see https://docs.djangoproject.com/en/2.1/topics/http/urls/#registering-custom-path-converters
 # url regex patterns
 YYYY = r'\d{4}'
 MM = r'(0[1-9]|1[0-2])'
@@ -16,14 +18,19 @@ Y = r'\d+'
 ID = r'\d+'
 
 rest_urls = [
+    # find all snodas dates
     url(
         r'^tiles/$',
         snodas_tiles.list_dates,
     ),
+
+    # snodas start, end, and missing dates (legacy)
     url(
         r'^tiles/date-params$',
         snodas_tiles.date_params,
     ),
+
+    # snodas raster tiles by date
     url(
         r'^tiles/(?P<date>{DATE})/(?P<zoom>{ZOOM})/(?P<x>{X})/(?P<y>{Y}).(?P<format>png|jpg|jpeg)$'.format(
             DATE=YYYYMMDD,
@@ -33,10 +40,14 @@ rest_urls = [
         ),
         snodas_tiles.get_tile,
     ),
+
+    # pourpoint geojson (points)
     url(
         r'^pourpoints/$',
         pourpoints.get_points,
     ),
+
+    # pourpoint tiles (polygons)
     url(
         r'^pourpoints/(?P<zoom>{ZOOM})/(?P<x>{X})/(?P<y>{Y}).mvt$'.format(
             ZOOM=ZOOM,
@@ -45,6 +56,8 @@ rest_urls = [
         ),
         pourpoints.get_tile,
     ),
+
+    # snodas stats raw query for data range by pourpoint
     url(
         r'^query/(?P<pourpoint_id>{ID})/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
             ID=ID,
@@ -52,6 +65,8 @@ rest_urls = [
         ),
     snodas_stats.get_raw_statistics_pourpoint,
     ),
+
+    # old stat query endpoint
     url(
         r"^query/(?P<start_year>{Y})/(?P<end_year>{Y})/(?P<month>{M})/(?P<day>{D})/$".format(
             Y=YYYY,
