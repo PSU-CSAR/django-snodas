@@ -14,7 +14,7 @@ YYYY = r'\d{4}'
 MM = r'(0[1-9]|1[0-2])'
 DD = r'(0[1-9]|[1-2][0-9]|3[0-1])'
 YYYYMMDD = r'{YYYY}-?{MM}-?{DD}'.format(YYYY=YYYY, MM=MM, DD=DD)
-ZOOM = r'[0]?[1-9]|1[0-5]'
+ZOOM = r'[0]?[0-9]|1[0-5]'
 X = r'\d+'
 Y = r'\d+'
 ID = r'\d+'
