@@ -25,7 +25,7 @@ rest_urls = [
         snodas_tiles.date_params,
     ),
     url(
-        r'^tiles/(?P<date>{DATE})/(?P<x>{X})/(?P<y>{Y}).(?P<format>png|jpg|jpeg)$'.format(
+        r'^tiles/(?P<date>{DATE})/(?P<zoom>{ZOOM})/(?P<x>{X})/(?P<y>{Y}).(?P<format>png|jpg|jpeg)$'.format(
             DATE=YYYYMMDD,
             ZOOM=ZOOM,
             X=X,
