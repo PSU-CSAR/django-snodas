@@ -18,14 +18,14 @@ def validate_geojson(geom):
                 geom = geom['features']['geometry']
             else:
                 raise GeoJSONValidationError(
-                    'GeoJSON must contain exactly 1 valid geometry',
-                )
+                        'GeoJSON must contain exactly 1 valid geometry',
+                    )
         elif geom['type'] == 'Feature':
             geom = geom['geometry']
     except KeyError:
         raise GeoJSONValidationError(
-            'GeoJSON appears to be invalid',
-        )
+                'GeoJSON appears to be invalid',
+            )
     return geom
 
 
@@ -35,19 +35,22 @@ def raw_stat_query(request, cursor, filename, stat_query):
     cursor.copy_expert(csvquery, flike)
 
     return stream_file(
-        flike,
-        filename,
-        request,
-        'text/csv',
-    )
+            flike,
+            filename,
+            request,
+            'text/csv',
+        )
 
 
-def get_raw_statistics_pourpoint(request, pourpoint_id, start_date, end_date):
+def get_raw_statistics_pourpoint(request, query_type, pourpoint_id,
+                                 start_date, end_date, name=None):
     if request.method != 'GET':
         return HttpResponse(reason="Not allowed", status=405)
 
     pp_query = '''SELECT
-  name
+  name,
+  ST_Y(point::geometry) as lat,
+  ST_X(point::geometry) as long
 FROM
   pourpoint.pourpoint
 WHERE
@@ -55,8 +58,8 @@ WHERE
 
     stat_query = '''SELECT
   date,
-  depth,
   swe,
+  depth,
   runoff,
   sublimation,
   sublimation_blowing,
@@ -81,13 +84,63 @@ ORDER BY
         if not pp:
             return HttpResponse(status=404)
 
-        pp_name = '{}_{}-{}.csv'.format(
-            "-".join(pp[0].split()),
-            start_date,
-            end_date,
+        if not name:
+            name = '{}_{}-{}.csv'.format(
+                    "-".join(pp[0].split()),
+                    start_date,
+                    end_date,
+                )
+
+        if query_type == 'point':
+            return get_raw_statistics_feature(
+                    request,
+                    start_date,
+                    end_date,
+                    lat=pp[1],
+                    long=pp[2],
+                    name=name,
+                )
+
+        return raw_stat_query(request, cursor, name, stat_query)
+
+
+def get_raw_statistics_feature(request, start_date, end_date, lat, long, name=None):
+    if request.method != 'GET' and not all([lat, long]):
+        return HttpResponse(reason="Not allowed", status=405)
+
+    stat_query = '''SELECT
+  date,
+  ST_Value(s.swe, p, False) as swe,
+  ST_Value(s.depth, p, False) as depth,
+  ST_Value(s.runoff, p, False) as runoff,
+  ST_Value(s.sublimation, p, False) as sublimation,
+  ST_Value(s.sublimation_blowing, p, False) as sublimation_blowing,
+  ST_Value(s.precip_solid, p, False) as precip_solid,
+  ST_Value(s.precip_liquid, p, False) as precip_liquid,
+  ST_Value(s.average_temp, p, False) as average_temp
+FROM
+  snodas.raster as s,
+  ST_SetSRID(ST_MakePoint({}, {}), 4326) as p
+WHERE
+  {}::daterange @> s.date'''
+
+    daterange = '[{}, {}]'.format(start_date, end_date)
+    stat_query = sql.SQL(stat_query).format(
+            sql.Literal(long),
+            sql.Literal(lat),
+            sql.Literal(daterange),
         )
 
-        return raw_stat_query(request, cursor, pp_name, stat_query)
+    with connection.cursor() as cursor:
+        if not name:
+            name = '{}-{}_{}-{}.csv'.format(
+                    lat,
+                    long,
+                    start_date,
+                    end_date,
+                )
+
+        return raw_stat_query(request, cursor, name, stat_query)
 
 
 def get_for_date(request, start_year, end_year, month, day):
@@ -96,24 +149,24 @@ def get_for_date(request, start_year, end_year, month, day):
 
     if start_year > end_year:
         return HttpResponse(
-            reason='Start year cannot be after end year: {} > {}'.format(
-                start_year,
-                end_year,
-            ),
-            status=400,
-        )
+                reason='Start year cannot be after end year: {} > {}'.format(
+                        start_year,
+                        end_year,
+                    ),
+                status=400,
+            )
 
     if month not in range(1, 13):
         return HttpResponse(
-            reason='Month {} is not a valid value'.format(month),
-            status=400,
-        )
+                reason='Month {} is not a valid value'.format(month),
+                status=400,
+            )
 
     if day not in range(1, (29 if month == 2 else 31 - (month - 1) % 7 % 2)):
         return HttpResponse(
-            reason='Invalid day {} for month {}'.format(day, month),
-            status=400,
-        )
+                reason='Invalid day {} for month {}'.format(day, month),
+                status=400,
+            )
 
     try:
         geom = validate_geojson(json.loads(request.body))
@@ -122,9 +175,9 @@ def get_for_date(request, start_year, end_year, month, day):
 
     with connection.cursor() as cursor:
         cursor.execute(
-            'SELECT * FROM snodas_query(%s, %s, %s, %s, ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326))',
-            [start_year, end_year, month, day, geom],
-        )
+                'SELECT * FROM snodas_query(%s, %s, %s, %s, ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326))',
+                [start_year, end_year, month, day, geom],
+            )
         row = cursor.fetchone()
 
     if not row:
@@ -139,24 +192,24 @@ def get_for_doy(request, start_year, end_year, doy):
 
     if start_year > end_year:
         return HttpResponse(
-            reason='Start year cannot be after end year: {} > {}'.format(
-                start_year,
-                end_year,
-            ),
-            status=400,
-        )
+                reason='Start year cannot be after end year: {} > {}'.format(
+                        start_year,
+                        end_year,
+                    ),
+                status=400,
+            )
 
     if doy not in range(1, 367):
         return HttpResponse(
-            reason='Day-of-year {} is not a valid value'.format(doy),
-            status=400,
-        )
+                reason='Day-of-year {} is not a valid value'.format(doy),
+                status=400,
+            )
 
     with connection.cursor() as cursor:
         cursor.execute(
-            'SELECT * FROM snodas_query(%s, %s, %s, ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326))',
-            [start_year, end_year, doy, geom],
-        )
+                'SELECT * FROM snodas_query(%s, %s, %s, ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326))',
+                [start_year, end_year, doy, geom],
+            )
         row = cursor.fetchone()
 
     if not row:

@@ -8,6 +8,8 @@ from .views import snodas_tiles, pourpoints, snodas_stats
 # TODO: change these to be django url convertors
 # see https://docs.djangoproject.com/en/2.1/topics/http/urls/#registering-custom-path-converters
 # url regex patterns
+LAT = r'(\+|-)?(?:90(?:(?:\.0*)?)|(?:[0-9]|[1-8][0-9])(?:(?:\.[0-9]*)?))'
+LONG = r'(\+|-)?(?:180(?:(?:\.0*)?)|(?:[0-9]|[1-9][0-9]|1[0-7][0-9])(?:(?:\.[0-9]*)?))'
 YYYY = r'\d{4}'
 MM = r'(0[1-9]|1[0-2])'
 DD = r'(0[1-9]|[1-2][0-9]|3[0-1])'
@@ -59,12 +61,29 @@ rest_urls = [
 
     # snodas stats raw query for data range by pourpoint
     url(
-        r'^query/(?P<pourpoint_id>{ID})/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
+        r'^query/pourpoint/(?P<query_type>point|polygon)/(?P<pourpoint_id>{ID})/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
             ID=ID,
             DATE=YYYYMMDD,
         ),
     snodas_stats.get_raw_statistics_pourpoint,
     ),
+
+    # snodas stat raw query for date range by arbitrary feature
+    url(
+        r'^query/feature/(?P<lat>{LAT})/(?P<long>{LONG})/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
+            LAT=LAT,
+            LONG=LONG,
+            DATE=YYYYMMDD,
+        ),
+        snodas_stats.get_raw_statistics_feature,
+    ),
+    # this would be for a post of a geojson feature, but us not yet implemented
+    #url(
+    #    r'^query/feature/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
+    #        DATE=YYYYMMDD,
+    #    ),
+    #    snodas_stats.get_raw_statistics_feature,
+    #),
 
     # old stat query endpoint
     url(
