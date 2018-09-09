@@ -108,7 +108,9 @@ def get_raw_statistics_feature(request, start_date, end_date, lat, long, name=No
     if request.method != 'GET' and not all([lat, long]):
         return HttpResponse(reason="Not allowed", status=405)
 
-    stat_query = '''SELECT
+    stat_query = '''WITH
+point AS (SELECT ST_SetSRID(ST_MakePoint({}, {}), 4326) as p)
+SELECT
   date,
   ST_Value(s.swe, p, False) as swe,
   ST_Value(s.depth, p, False) as depth,
@@ -120,7 +122,7 @@ def get_raw_statistics_feature(request, start_date, end_date, lat, long, name=No
   ST_Value(s.average_temp, p, False) as average_temp
 FROM
   snodas.raster as s,
-  ST_SetSRID(ST_MakePoint({}, {}), 4326) as p
+  (SELECT p FROM point) as p
 WHERE
   {}::daterange @> s.date'''
 
