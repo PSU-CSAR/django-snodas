@@ -108,6 +108,9 @@ def get_raw_statistics_feature(request, start_date, end_date, lat, long, name=No
     if request.method != 'GET' and not all([lat, long]):
         return HttpResponse(reason="Not allowed", status=405)
 
+    # I'm a teapot for the time being
+    return HttpResponse(status=418)
+
     stat_query = '''WITH
 point AS (SELECT ST_SetSRID(ST_MakePoint({}, {}), 4326) as p)
 SELECT
