@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 function mvp() {
     dir="$2"
     tmp="$2"; tmp="${tmp: -1}"
@@ -10,7 +9,6 @@ function mvp() {
     mv "$@"
 }
 
-
 function process_raster() {
     snodas loadraster "$1" && mvp "$1" "$2" && echo "Processed $1" || echo "Error processing $1"
 }
@@ -18,21 +16,58 @@ function process_raster() {
 export -f process_raster
 export -f mvp
 
-
 workers=$1
 src_dir=$2
 out_dir=$3
 
-
-# get all files to process
-shopt -s globstar
 pushd "${src_dir}" > /dev/null
-files=( ** )
+
+# we get SNODAS files pushed to us in a weird format
+# to accommodate, we find all .grz files (if any)
+# and build into the equally-strange SNODAS tar format
+dates=$(ls *.grz | grep -oP '(?<!\d)\d{8}' | sort -u)
+for date in ${dates[@]}; do
+    (
+        tmp=$(mktemp -d)
+	trap "rm -r $tmp" EXIT
+
+        year=${date:0:4}
+        month=${date:4:2}
+        day=${date:6:2}
+
+        # we get the files as tar.gz in a weird .grz ext
+        # we need each gzipped individually in a tar, stupidly
+        # so for each .grz we untar/expand it to tmp
+        for f in *$date*.grz; do
+            fname="${f%.*}"
+            tar -xzf $f -C $tmp
+        done
+
+        # now we gzip each file in the tmp dir
+        (cd $tmp; ls | xargs -n 1 gzip)
+
+        # lastly we tar up all the files in the tmp dir
+        # outputting to the current dir
+        file=SNODAS_${year}${month}${day}.tar
+        tar -cf $file -C $tmp .
+
+	# and we can remove the original grz files
+	rm *$date*.grz
+    )
+done
+
+# now we find all the tar files in the current dir
+tars=$(ls *.tar)
 popd > /dev/null
 
-(for file in ${files[@]}; do
+# we can process the tars now
+(for file in ${tars[@]}; do
     in="${src_dir}/${file}"
-    out="${out_dir}/${file}"
+    filename=$(basename $file)
+    date=$(echo $filename | grep -oP '(?<!\d)\d{8}')
+    year=${date:0:4}
+    month=${date:4:2}
+    out="${out_dir}/${year}/${month}/${filename}"
     [ -f "${in}" ] || continue
     echo "${in} ${out}"
 done) | xargs -r -L1 -P ${workers} -t bash -c 'process_raster "$0" "$1"'

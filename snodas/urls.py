@@ -2,7 +2,9 @@ from django.conf.urls import include, url
 
 from .settings import REST_ROOT, DEBUG, INSTALLED_APPS
 
-from .views import snodas_tiles, pourpoints, snodas_stats
+from .views import snodas_tiles, pourpoints, snodas_stats, snodas_analysis
+
+from .constants import snodas_variables
 
 
 # TODO: change these to be django url convertors
@@ -18,6 +20,7 @@ ZOOM = r'[0]?[0-9]|1[0-5]'
 X = r'\d+'
 Y = r'\d+'
 ID = r'\d+'
+SNODAS_VARS = "|".join(snodas_variables)
 
 rest_urls = [
     # find all snodas dates
@@ -68,6 +71,17 @@ rest_urls = [
     snodas_stats.get_raw_statistics_pourpoint,
     ),
 
+    # snodas stats raw query for doy by pourpoint
+    url(
+        r'^query/pourpoint/(?P<query_type>polygon)/(?P<pourpoint_id>{ID})/(?P<month>{MM})-(?P<day>{DD})/(?P<start_year>{YYYY})/(?P<end_year>{YYYY})/$'.format(
+            ID=ID,
+            DD=DD,
+            MM=MM,
+            YYYY=YYYY,
+        ),
+    snodas_stats.get_raw_statistics_pourpoint_date,
+    ),
+
     # snodas stat raw query for date range by arbitrary feature
     url(
         r'^query/feature/(?P<lat>{LAT})/(?P<long>{LONG})/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
@@ -93,6 +107,27 @@ rest_urls = [
             D=DD,
         ),
         snodas_stats.get_for_date,
+    ),
+
+    # export snodas raster in netcdf for aoi
+    #url(
+    #    r'^export/pourpoint/(?P<pourpoint_id>{ID})/(?P<variable>{SNODAS_VARS})/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
+    #        ID=ID,
+    #        DATE=YYYYMMDD,
+    #        SNODAS_VARS=SNODAS_VARS,
+    #    ),
+    #snodas_stats.get_raw_statistics_pourpoint,
+    #),
+
+    # streamflow regression query
+    url(
+        r'^analysis/streamflow/(?P<variable>{SNODAS_VARS})/(?P<forecast_start>{MM})/(?P<forecast_end>{MM})/(?P<month>{MM})-(?P<day>{DD})/(?P<start_year>{YYYY})/(?P<end_year>{YYYY})/$'.format(
+            SNODAS_VARS=SNODAS_VARS,
+            DD=DD,
+            MM=MM,
+            YYYY=YYYY,
+        ),
+    snodas_analysis.streamflow_regression,
     ),
 ]
 

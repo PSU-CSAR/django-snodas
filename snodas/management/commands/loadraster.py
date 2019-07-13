@@ -5,8 +5,7 @@ import glob
 import tarfile
 import shutil
 
-from io import StringIO, BytesIO
-from datetime import datetime
+from io import BytesIO
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
@@ -74,15 +73,19 @@ class Command(BaseCommand):
         )
         date = self.validate_raster_dates(rasters)
 
-        raster_streams = [
-                rasters['swe']['raster'],
-                rasters['depth']['raster'],
-                rasters['runoff']['raster'],
-                rasters['sublimation']['raster'],
-                rasters['sublimation_blowing']['raster'],
-                rasters['precip_solid']['raster'],
-                rasters['precip_liquid']['raster'],
-        ]
+        try:
+            raster_streams = [
+                    rasters['swe']['raster'],
+                    rasters['depth']['raster'],
+                    rasters['runoff']['raster'],
+                    rasters['sublimation']['raster'],
+                    rasters['sublimation_blowing']['raster'],
+                    rasters['precip_solid']['raster'],
+                    rasters['precip_liquid']['raster'],
+            ]
+        except KeyError as e:
+            print('ERROR: SNODAS data appears incomplete: {}'.format(str(e)))
+            raise
 
         try:
             raster_streams.append(rasters['average_temp']['raster'])
@@ -93,13 +96,16 @@ class Command(BaseCommand):
             # we have a hard override just for
             # this weird histroical accident
             if AVERAGE_TEMP_REQUIRED:
+                print(
+                    'ERROR: SNODAS data appears incomplete: {}'.format(str(e))
+                )
                 raise
             raster_streams.append(BytesIO(b'\N'))
 
         raster_streams.append(BytesIO(date.encode()))
         ftype = chain_streams(raster_streams, sep=b'\t')
 
-        print('Inserting record into database')
+        print('Inserting record into database for date {}'.format(date))
         with connection.cursor() as cursor:
             try:
                 cursor.copy_from(ftype, self.table)

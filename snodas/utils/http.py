@@ -1,10 +1,6 @@
-from __future__ import absolute_import
-
 import sys
 import logging
-import os
 import re
-import mimetypes
 
 from django.http import HttpResponse, StreamingHttpResponse
 

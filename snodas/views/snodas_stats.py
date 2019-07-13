@@ -104,6 +104,67 @@ ORDER BY
         return raw_stat_query(request, cursor, name, stat_query)
 
 
+def get_raw_statistics_pourpoint_date(request, query_type, pourpoint_id, month,
+                                      day, start_year, end_year, name=None):
+    if request.method != 'GET':
+        return HttpResponse(reason="Not allowed", status=405)
+
+    pp_query = '''SELECT
+  name,
+  ST_Y(point::geometry) as lat,
+  ST_X(point::geometry) as long
+FROM
+  pourpoint.pourpoint
+WHERE
+  pourpoint_id = %s'''
+
+    stat_query = '''SELECT
+  date,
+  swe,
+  depth,
+  runoff,
+  sublimation,
+  sublimation_blowing,
+  precip_solid,
+  precip_liquid,
+  average_temp
+FROM
+  pourpoint.statistics
+WHERE
+  pourpoint_id = {}
+  AND {}::int4range @> date_part('year', date)::integer
+  AND {} = date_part('month', date)
+  AND {} = date_part('day', date)
+ORDER BY
+  date'''
+
+    year_range = '[{}, {}]'.format(start_year, end_year)
+    stat_query = sql.SQL(stat_query).format(
+        sql.Literal(pourpoint_id),
+        sql.Literal(year_range),
+        sql.Literal(month),
+        sql.Literal(day),
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(pp_query, [pourpoint_id])
+        pp = cursor.fetchone()
+
+        if not pp:
+            return HttpResponse(status=404)
+
+        if not name:
+            name = '{}_{}-{}_{}-{}.csv'.format(
+                    "-".join(pp[0].split()),
+                    month,
+                    day,
+                    start_year,
+                    end_year,
+                )
+
+        return raw_stat_query(request, cursor, name, stat_query)
+
+
 def get_raw_statistics_feature(request, start_date, end_date, lat, long, name=None):
     if request.method != 'GET' and not all([lat, long]):
         return HttpResponse(reason="Not allowed", status=405)
