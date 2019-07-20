@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -eu
 
 function mvp() {
     dir="$2"
@@ -10,22 +10,24 @@ function mvp() {
 }
 
 function process_raster() {
-    snodas loadraster "$1" && mvp "$1" "$2" && echo "Processed $1" || echo "Error processing $1"
+    local snodas_cmd=$1; shift
+    $snodas_cmd loadraster "$1" && mvp "$1" "$2" && echo "Processed $1" || echo "Error processing $1"
 }
 
 export -f process_raster
 export -f mvp
 
 workers=$1
-src_dir=$2
-out_dir=$3
+src_dir=${2%/}
+out_dir=${3%/}
+snodas_cmd=$4
 
 pushd "${src_dir}" > /dev/null
 
 # we get SNODAS files pushed to us in a weird format
 # to accommodate, we find all .grz files (if any)
 # and build into the equally-strange SNODAS tar format
-dates=$(ls *.grz | grep -oP '(?<!\d)\d{8}' | sort -u)
+dates=$(ls *.grz 2>/dev/null | grep -oP '(?<!\d)\d{8}' | sort -u)
 for date in ${dates[@]}; do
     (
         tmp=$(mktemp -d)
@@ -56,13 +58,14 @@ for date in ${dates[@]}; do
     )
 done
 
-# now we find all the tar files in the current dir
-tars=$(ls *.tar)
 popd > /dev/null
+
+# now we find all the tar files in the src dir
+tars=$(find "${src_dir}" -name "*.tar")
 
 # we can process the tars now
 (for file in ${tars[@]}; do
-    in="${src_dir}/${file}"
+    in="${file}"
     filename=$(basename $file)
     date=$(echo $filename | grep -oP '(?<!\d)\d{8}')
     year=${date:0:4}
@@ -70,4 +73,4 @@ popd > /dev/null
     out="${out_dir}/${year}/${month}/${filename}"
     [ -f "${in}" ] || continue
     echo "${in} ${out}"
-done) | xargs -r -L1 -P ${workers} -t bash -c 'process_raster "$0" "$1"'
+done) | xargs -r -L1 -P ${workers} -t bash -c 'process_raster "$1" "$2" "3"' -- ${snodas_cmd}

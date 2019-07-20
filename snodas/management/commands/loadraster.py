@@ -21,6 +21,7 @@ from ..utils import to_namedtuple, FullPaths, is_file, is_dir, chain_streams
 
 
 AVERAGE_TEMP_REQUIRED = True
+HDR_EXTS = ('.Hdr', '.txt')
 
 
 class Command(BaseCommand):
@@ -125,7 +126,7 @@ class Command(BaseCommand):
         https://nsidc.org/data/g02158#untar_daily_nc'''
         name, ext = os.path.splitext(os.path.basename(path))
 
-        if ext != '.Hdr':
+        if ext not in HDR_EXTS:
             raise SNODASError('File ext {} is unknown'.format(ext))
 
         info = re.match(
@@ -211,7 +212,10 @@ class Command(BaseCommand):
                         open(outpath, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
 
-            hdrs = glob.glob(os.path.join(outdir, '*.Hdr'))
+            hdrs = []
+            for ext in HDR_EXTS:
+                hdrs.extend(glob.glob(os.path.join(outdir, '*{}'.format(ext))))
+
             for idx, hdr in enumerate(hdrs, start=1):
                 print(
                     'Importing {} of {}: {}'.format(
