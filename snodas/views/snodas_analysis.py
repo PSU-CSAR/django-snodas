@@ -27,18 +27,31 @@ def streamflow_regression(request, variable, forecast_start, forecast_end,
     if request.method != 'GET':
         return HttpResponse(reason="Not allowed", status=405)
 
-    year_range = '[{}, {}]'.format(start_year, end_year)
-    month_range = '[{}, {}]'.format(forecast_start, forecast_end)
+    forecast_start = int(forecast_start)
+    forecast_end = int(forecast_end)
+    month = int(month)
+    day = int(day)
+    start_year = int(start_year)
+    end_year = int(end_year)
+
+    streamflow_columns = ', '.join(
+        ['streamflow_{} double precision'.format(year)
+         for year in range(start_year, end_year+1)]
+    )
+    value_columns = ', '.join(
+        ['{}_{} double precision'.format(variable, year)
+         for year in range(start_year, end_year+1)]
+    )
     query = streamflow.regression(
         variable=variable,
         day=day,
         month=month,
-        month_range=month_range,
-        year_range=year_range,
         start_month=forecast_start,
         end_month=forecast_end,
         start_year=start_year,
         end_year=end_year,
+        streamflow_columns=streamflow_columns,
+        value_columns=value_columns,
     )
 
     with connection.cursor() as cursor:

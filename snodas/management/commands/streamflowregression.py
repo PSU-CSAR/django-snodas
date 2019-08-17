@@ -92,20 +92,24 @@ class Command(BaseCommand):
         )
 
     def run_query(self):
-        year_range = '[{}, {}]'.format(
-            self.options.start_year, self.options.end_year)
-        month_range = '[{}, {}]'.format(
-            self.options.start_month, self.options.end_month)
+        streamflow_columns = ', '.join(
+            ['streamflow_{} double precision'.format(year)
+             for year in range(self.options.start_year, self.options.end_year+1)]
+        )
+        value_columns = ', '.join(
+            ['{}_{} double precision'.format(self.options.variable, year)
+             for year in range(self.options.start_year, self.options.end_year+1)]
+        )
         query = streamflow.regression(
             variable=self.options.variable,
             day=self.options.day,
             month=self.options.month,
-            month_range=month_range,
-            year_range=year_range,
             start_month=self.options.start_month,
             end_month=self.options.end_month,
             start_year=self.options.start_year,
             end_year=self.options.end_year,
+            streamflow_columns=streamflow_columns,
+            value_columns=value_columns,
         )
 
         with connection.cursor() as cursor:
