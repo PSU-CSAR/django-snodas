@@ -10,8 +10,7 @@ function mvp() {
 }
 
 function process_raster() {
-    local snodas_cmd=$1; shift
-    $snodas_cmd loadraster "$1" && mvp "$1" "$2" && echo "Processed $1" || echo "Error processing $1"
+    snodas loadraster "$1" && mvp "$1" "$2" && echo "Processed $1" || echo "Error processing $1"
 }
 
 export -f process_raster
@@ -20,7 +19,6 @@ export -f mvp
 workers=$1
 src_dir=${2%/}
 out_dir=${3%/}
-snodas_cmd=$4
 
 pushd "${src_dir}" > /dev/null
 
@@ -73,4 +71,4 @@ tars=$(find "${src_dir}" -name "*.tar")
     out="${out_dir}/${year}/${month}/${filename}"
     [ -f "${in}" ] || continue
     echo "${in} ${out}"
-done) | xargs -r -L1 -P ${workers} -t bash -c 'process_raster "$1" "$2" "3"' -- ${snodas_cmd}
+done) | xargs -r -L1 -P ${workers} -t bash -c 'process_raster "$1" "$2"' --
