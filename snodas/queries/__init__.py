@@ -59,13 +59,15 @@ class ParseError(ValueError):
 
 class _QueriesFactory:
     _query_re = _re.compile(
-        r'((?:---.*\n?)+)((?:(?!=^---).*?\n)+?)(?:(?:--- endquery$))'
+        r'((?:---.*\n?)+)((?:(?!=^---).*?\n)+?)(?:(?:--- endquery.*$))',
+        flags=_re.M,
     )
     _topdoc_re = _re.compile(r'(?:\A--=)(.*?)(?:^--=)', flags=_re.M|_re.S)
     _meta_replace_re = _re.compile(r'^---\s*')
     _name_re = _re.compile(r'(?:name:\s+)([\w\s]+)')
     _param_re = _re.compile(r'(?:param:\s+)(\w+)')
     _id_re = _re.compile(r'(?:id:\s+)(\w+)')
+    _raw_re = _re.compile(r'(?:raw:\s+)(\w+)')
 
     def __init__(self, queries=None):
         if queries:
@@ -73,21 +75,31 @@ class _QueriesFactory:
                 self.add(*query)
 
     @staticmethod
-    def _add(self, name, ids, params, docstr, sql):
+    def _add(self, name, ids, params, raws, docstr, sql):
         if name in self.__dict__:
             raise ParseError("Duplicate query name: '{}'".format(name))
 
-        args = ', '.join(params.union(ids))
+        args = ', '.join(params.union(ids).union(raws))
         idstring = ', '.join(['{i}_i=Ident({i})'.format(i=i) for i in ids.intersection(params)])
         idstring += ', '.join(['{i}=Ident({i})'.format(i=i) for i in ids.difference(params)])
+        rawstring = ', '.join(['{r}=Raw(str({r}))'.format(r=r) for r in raws])
         paramstring = ', '.join(['{p}=Lit({p})'.format(p=p) for p in params])
         func = "def {name}({args}):\n    return sql.format({kwargs})\n".format(
             name=name,
             args=args,
-            kwargs=', '.join(filter(bool, [idstring, paramstring])),
+            kwargs=', '.join(filter(bool, [idstring, paramstring, rawstring])),
         )
         code = compile(func, '<string>', 'exec')
-        eval(code, {'sql': sql, 'Lit': _Literal, 'Ident': _Identifier}, self.__dict__)
+        eval(
+            code,
+            {
+                'sql': sql,
+                'Lit': _Literal,
+                'Ident': _Identifier,
+                'Raw': _SQL,
+            },
+            self.__dict__,
+        )
         self.__dict__[name].__doc__ = docstr
 
     @classmethod
@@ -98,9 +110,8 @@ class _QueriesFactory:
         if filepath:
             queries.__file__ = filepath
         for meta, sql in _qs:
-
-            name, ids, params, docstr = cls._extract_meta(meta)
-            cls._add(queries, name, ids, params, docstr, _SQL(sql))
+            name, ids, params, raws, docstr = cls._extract_meta(meta)
+            cls._add(queries, name, ids, params, raws, docstr, _SQL(sql))
         return queries
 
     @classmethod
@@ -108,6 +119,7 @@ class _QueriesFactory:
         names = []
         params = set()
         ids = set()
+        raws = set()
         docstr = ''
 
         for line in meta_text.split('\n'):
@@ -135,6 +147,14 @@ class _QueriesFactory:
                 ids.add(_id)
                 continue
 
+            is_raw = cls._raw_re.match(line)
+            if is_raw:
+                raw = is_raw.group(1)
+                if raw in raws:
+                    raise ParseError("Query identifier specified more than once: '{}'".format(_id))
+                raws.add(raw)
+                continue
+
             docstr += line + '\n'
 
         docstr = docstr[:-1]
@@ -148,7 +168,7 @@ class _QueriesFactory:
                 'Unnamed query cannot be processed',
             )
 
-        return names[0], ids, params, docstr
+        return names[0], ids, params, raws, docstr
 
     @classmethod
     def load(cls, query_file):
