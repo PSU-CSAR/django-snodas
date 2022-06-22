@@ -14,7 +14,7 @@ try:
         BaseCommand, CommandError, CommandParser
     )
 except ImportError:
-    pass
+    BaseCommand = object
 
 # if we are calling this from the install command in snodas.py,
 # this import will fail with the error "attempted a relative
@@ -25,6 +25,8 @@ except ImportError:
 try:
     from .. import utils
 except ValueError:
+    import utils
+except ImportError:
     import utils
 
 
