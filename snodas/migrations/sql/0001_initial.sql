@@ -571,15 +571,15 @@ CREATE TABLE pourpoint.statistics (
     CHECK (depth >= 0),
   "swe" float NOT NULL                     -- meters
     CHECK (swe >= 0),
-  "runoff" float NOT NULL                  -- meters
+  "runoff" float NOT NULL,                 -- meters
     --CHECK (runoff >= 0),
-  "sublimation" float NOT NULL             -- meters
+  "sublimation" float NOT NULL,            -- meters
     --CHECK (sublimation >= 0),
-  "sublimation_blowing" float NOT NULL     -- meters
+  "sublimation_blowing" float NOT NULL,    -- meters
     --CHECK (sublimation_blowing >= 0),
-  "precip_solid" float NOT NULL            -- kg/m^2
+  "precip_solid" float NOT NULL,           -- kg/m^2
     --CHECK (precip_solid >= 0),
-  "precip_liquid" float NOT NULL           -- kg/m^2
+  "precip_liquid" float NOT NULL,          -- kg/m^2
     --CHECK (precip_liquid >= 0),
   "average_temp" float                     -- kelvin (null if nodata in all cells)
     CHECK (average_temp  >= 0),
