@@ -400,8 +400,8 @@ class Install(object):
         if options.get('overwrite_env'):
             install_cmd.append('--force')
 
-        #if options.get('install_conda_req'):
-        #    install_cmd.extend(['--file', options.get('conda_requirements')])
+        if options.get('install_conda_req'):
+            install_cmd.extend(['--file', options.get('conda_requirements')])
 
         # if overwrite_env isn't set to replace an existing env,
         # then we want to check for the env and fail if exists
