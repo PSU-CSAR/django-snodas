@@ -30,13 +30,6 @@ except ImportError:
     import utils
 
 
-if sys.version_info[0] == 2:
-    iteritems = dict.iteritems
-    input = raw_input
-else:
-    iteritems = dict.items
-
-
 class remove_const(argparse.Action):
 
     def __init__(self,
@@ -482,7 +475,7 @@ class Install(object):
         if self.verbosity < 2:
             return
         print('Using the following configuration settings:')
-        for key, val in sorted(iteritems(self.settings)):
+        for key, val in sorted(self.settings.items()):
             print("    {} = {}".format(key, val))
 
     def vprint(self, level, *args, **kwargs):
