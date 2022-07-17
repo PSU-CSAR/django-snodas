@@ -1,7 +1,6 @@
 from getpass import getpass
 
 from psycopg2 import connect
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -55,7 +54,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        if settings.ENV == 'production':
+        if settings.DEPLOYMENT_TYPE == 'production':
             raise CommandError('I won\'t run on a production database. Sorry.')
 
         router = options.get('router')
@@ -92,19 +91,28 @@ class Command(BaseCommand):
             print('Drop cancelled.')
             return
 
-        # need to make sure we're not connected to the DB?
+        # need to make sure django is not connected to the DB
         connection.close()
 
-        with connect(
-            dbname='postgres',
-            user=dbuser,
-            password=dbpass,
-            host=dbhost,
-            port=dbport,
-        ) as conn:
-            conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-            cursor = conn.cursor()
-            cursor.execute('DROP DATABASE IF EXISTS {}'.format(dbname))
+        try:
+            conn = connect(
+                dbname='postgres',
+                user=dbuser,
+                password=dbpass,
+                host=dbhost,
+                port=dbport,
+            )
+            conn.autocommit = True
+            with conn.cursor() as cursor:
+                cursor.execute('DROP DATABASE IF EXISTS {}'.format(dbname))
 
-            if options.get('drop_user'):
-                cursor.execute('DROP USER IF EXISTS {}'.format(dbinfo.get('USER')))
+                if options.get('drop_user'):
+                    cursor.execute(
+                        'DROP USER IF EXISTS {}'.format(dbinfo.get('USER')),
+                    )
+                    cursor.execute('DROP USER IF EXISTS {}'.format(dbinfo.get('USER')))
+        finally:
+            try:
+                conn.close()
+            except (NameError, AttributeError):
+                pass

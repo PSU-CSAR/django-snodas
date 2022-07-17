@@ -287,10 +287,10 @@ class Command(BaseCommand):
     def set_project_permissions(self):
         # set permissions on the root project directory for the IIS site user
         cmd = ['ICACLS', get_project_root(), '/t', '/grant',
-               'IIS AppPool\{}:F'.format(settings.INSTANCE_NAME)]
+               'IIS AppPool\{}:F'.format(settings.PROJECT_NAME)]
         subprocess.check_call(cmd)
         cmd = ['ICACLS', library_bin_dir(sys.executable), '/t', '/grant',
-               'IIS AppPool\{}:F'.format(settings.INSTANCE_NAME)]
+               'IIS AppPool\{}:F'.format(settings.PROJECT_NAME)]
         subprocess.check_call(cmd)
 
     def install(self, args, options):
@@ -438,7 +438,7 @@ directory !''')
         self.web_config = os.path.join(self.install_dir, 'web.config')
 
         if options['site_name'] == '':
-            options['site_name'] = settings.INSTANCE_NAME
+            options['site_name'] = settings.PROJECT_NAME
 
         if not os.path.exists(self.appcmd):
             raise CommandError(
@@ -471,7 +471,7 @@ set the correct certificate:
 2) Expand the "Sites" in the left navigation panel
 3) Right-click "{}" and choose "Edit Bindings"
 4) Edit the binding and choose the correct SSL Certificate'''.format(
-            settings.INSTANCE_NAME)
+            settings.PROJECT_NAME)
         )
 
 

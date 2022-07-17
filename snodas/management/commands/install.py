@@ -62,6 +62,10 @@ class remove_const(argparse.Action):
             setattr(namespace, self.dest, items)
 
 
+def is_development(settings):
+    return settings['DEPLOYMENT_TYPE'] == 'development'
+
+
 class InstallError(Exception):
     pass
 
@@ -306,10 +310,8 @@ class Install(object):
                 .format(pyfile),
            )
 
-        settings['IS_DEVELOPMENT'] = settings['TYPE'] == 'development'
-
         settings['DEBUG'] = (
-            settings['IS_DEVELOPMENT'] or options.get('debug')
+            is_development(settings) or options.get('debug')
         )
 
         settings['PROJECT_NAME'] = options['project_name']

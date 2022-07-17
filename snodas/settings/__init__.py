@@ -5,13 +5,13 @@ from ..management.utils import load_conf_file
 
 conf_settings = load_conf_file()
 
-INSTANCE_NAME = conf_settings.get('INSTANCE_NAME')
-ENV = conf_settings.get('ENV', 'production')
+PROJECT_NAME = conf_settings.get('PROJECT_NAME')
+DEPLOYMENT_TYPE = conf_settings.get('DEPLOYMENT_TYPE', 'production')
 
 SECRET_KEY = conf_settings.get('SECRET_KEY')
 
-DATABASE_NAME = conf_settings.get('DATABASE_NAME', INSTANCE_NAME)
-DATABASE_USER = conf_settings.get('DATABASE_USER', INSTANCE_NAME)
+DATABASE_NAME = conf_settings.get('DATABASE_NAME', PROJECT_NAME)
+DATABASE_USER = conf_settings.get('DATABASE_USER', PROJECT_NAME)
 DATABASE_PASSWORD = conf_settings.get('DATABASE_PASSWORD')
 DATABASE_HOST = conf_settings.get('DATABASE_HOST', None)
 DATABASE_PORT = conf_settings.get('DATABASE_PORT', None)
@@ -34,7 +34,7 @@ settings_files = [
 ]
 
 # add the env-specific settings and any additional settings
-#settings_files.append(optional(ENV+'.py'))
+#settings_files.append(optional(DEPLOYMENT_TYPE+'.py'))
 settings_files.extend(conf_settings.get('ADDITIONAL_SETTING_FILES', []))
 
 # always use the local settings file if present

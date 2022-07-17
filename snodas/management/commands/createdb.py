@@ -4,7 +4,6 @@ import sys
 from getpass import getpass
 
 from psycopg2 import connect, ProgrammingError
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 from django.conf import settings
 from django.core import management
@@ -87,14 +86,15 @@ class Command(BaseCommand):
                 admin_pass=createpass,
             )
 
-        with connect(
-            dbname='postgres',
-            user=createuser,
-            password=createpass,
-            host=dbhost,
-            port=dbport,
-        ) as connection:
-            connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        try:
+            connection = connect(
+                dbname='postgres',
+                user=createuser,
+                password=createpass,
+                host=dbhost,
+                port=dbport,
+            )
+            connection.autocommit = True
             with connection.cursor() as cursor:
                 # create the owner role for consistent object ownership
                 try:
@@ -123,22 +123,33 @@ class Command(BaseCommand):
                         owner,
                     ),
                 )
+        finally:
+            try:
+                connection.close()
+            except (NameError, AttributeError):
+                pass
 
-        with connect(
-            dbname=dbname,
-            user=createuser,
-            password=createpass,
-            host=dbhost,
-            port=dbport,
-        ) as connection:
-            connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        try:
+            connection = connect(
+                dbname=dbname,
+                user=createuser,
+                password=createpass,
+                host=dbhost,
+                port=dbport,
+            )
+            connection.autocommit = True
             with connection.cursor() as cursor:
                 # let's add the extenions that require superuser permissions
                 cursor.execute('CREATE EXTENSION pg_tms CASCADE')
                 cursor.execute('CREATE EXTENSION btree_gist')
+        finally:
+            try:
+                connection.close()
+            except (NameError, AttributeError):
+                pass
 
         print((
             '\nDatabase {} created. '
             'Be sure to run the data migrations:\n\n'
             '`{} migrate [options]`'
-        ).format(settings.INSTANCE_NAME, os.path.basename(sys.argv[0])))
+        ).format(settings.PROJECT_NAME, os.path.basename(sys.argv[0])))
