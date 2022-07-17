@@ -83,7 +83,7 @@ def get_password(prompt):
 # django installed via a special version of manage.py (in this
 # project as snodas.py).
 class Install(object):
-    help = "Install this snodas instance to the local system."
+    help = "Install this snodas project instance to the local system."
 
     def __init__(self):
         pass
@@ -143,15 +143,15 @@ class Install(object):
         )
         parser.add_argument(
             '-n',
-            '--instance-name',
-            help=('The name of the snodas instance. '
-                  'Default the name of the directory '
-                  'containing this django-snodas instance.'),
+            '--project-name',
+            required=True,
+            help=('The name of the snodas project instance.'),
         )
         parser.add_argument(
+            '-d',
             '--domain-name',
-            help=('The domain name of this snodas instance. '
-                  'Default is to prompt for user input.'),
+            required=True,
+            help=('The domain name of this snodas project instance.'),
         )
         parser.add_argument(
             '-N',
@@ -194,17 +194,18 @@ class Install(object):
                   'Default is 50 chars.'),
         )
         parser.add_argument(
-            '-e',
-            '--env',
-            help=('The environment name. '
-                  'Should match an env-specific settings module. '
-                  'Default is to inspect instance path and extract.'),
+            '-t',
+            '--deployment-type',
+            choices=['development', 'testing', 'production'],
+            required=True,
+            help=('The deployment type. '
+                  'Should match an deployment-specific settings module.'),
         )
         parser.add_argument(
             '--debug',
             action='store_true',
             help=('Enable debug mode. '
-                  'Default is disabled unless ENV is development. '
+                  'Default is disabled unless deployment type is development. '
                   'DO NOT use debug in production.'),
         )
         parser.add_argument(
@@ -229,11 +230,15 @@ class Install(object):
                   'Default is to use whatever conda is on the path.'),
         )
         parser.add_argument(
+            '--env-name',
+            help='The name of the conda env. Default is the instance name.',
+        )
+        parser.add_argument(
             '--no-env',
             dest='make_env',
             action='store_false',
             help=('Don\'t make a conda env, '
-                  'just intall to the current python. '
+                  'just install to the current python. '
                   'Default is to make a new conda env.'),
         )
         parser.add_argument(
@@ -257,26 +262,13 @@ class Install(object):
                   'Default is to get version designated in setup.py'),
         )
         parser.add_argument(
-            '-F',
-            '--force',
+            '--overwrite-env',
             action='store_true',
             help=('Force creation of conda env '
                   '(removing a previously existing '
                   'environment of the same name).'
                   'Default is to error if an env '
                   'already exists of the same name.'),
-        )
-
-        # install options
-        parser.add_argument(
-            '-d',
-            '--dev',
-            dest='install_options',
-            action='append_const',
-            const='dev',
-            help=('Include development packages with installation. '
-                  'Default is false, unless env is development, '
-                  'in which case this option cannot be disabled.'),
         )
 
     @classmethod
@@ -305,34 +297,22 @@ class Install(object):
     def extract_settings_from_options(self, options):
         settings = {}
 
-        settings['ENV'] = options.get('env') or utils.get_env_name()
+        settings['TYPE'] = options.get('deployment_type')
 
-        if not settings['ENV']:
-            raise InstallError(
-                'Could not extract env name from path and none specified.'
-            )
-
-        pyfile = settings['ENV'] + '.py'
+        pyfile = settings['TYPE'] + '.py'
         if not os.path.isfile(utils.get_settings_file(pyfile)):
             warnings.warn(
                 'Could not find settings file for env named {}'
                 .format(pyfile),
-            )
+           )
+
+        settings['IS_DEVELOPMENT'] = settings['TYPE'] == 'development'
 
         settings['DEBUG'] = (
-            settings['ENV'] == 'development' or options.get('DEBUG')
+            settings['IS_DEVELOPMENT'] or options.get('debug')
         )
 
-        settings['INSTANCE_NAME'] = utils.get_default(
-            options,
-            'instance_name',
-            utils.get_instance_name(),
-        )
-
-        if not settings['INSTANCE_NAME']:
-            raise InstallError(
-                'Could not extract instance name from path and none specified.'
-             )
+        settings['PROJECT_NAME'] = options['project_name']
 
         settings['SECRET_KEY'] = utils.get_default(
             options,
@@ -343,7 +323,7 @@ class Install(object):
         settings['DATABASE_NAME'] = utils.get_default(
             options,
             'db_name',
-            settings['INSTANCE_NAME'],
+            settings['PROJECT_NAME'],
         )
         settings['DATABASE_USER'] = utils.get_default(
             options,
@@ -358,18 +338,19 @@ class Install(object):
         settings['DATABASE_HOST'] = utils.get_default(options, 'db_host', None)
         settings['DATABASE_PORT'] = utils.get_default(options, 'db_port', None)
 
-
-        settings['SITE_DOMAIN_NAME'] = utils.get_default(
-            options,
-            'domain',
-            input('Enter in the domain name for this project instance: '),
-        )
+        settings['SITE_DOMAIN_NAME'] = options['domain_name']
         settings['SUBDOMAINS'] = []
 
         settings['ADDITIONAL_SETTINGS_FILES'] = utils.get_default(
             options,
             'additional_settings_file',
             [],
+        )
+
+        settings['CONDA_ENV_NAME'] = utils.get_default(
+            options,
+            'env_name',
+            settings['PROJECT_NAME'],
         )
 
         return settings
@@ -399,10 +380,14 @@ class Install(object):
         conda = options.get('conda')
 
         conda_info = json.loads(
-                subprocess.check_output([conda, 'info', '--json'])
+                subprocess.run(
+                    [conda, 'info', '--json'],
+                    check=True,
+                    capture_output=True,
+                ).stdout
             )
 
-        name = self.settings['INSTANCE_NAME']
+        name = self.settings['CONDA_ENV_NAME']
 
         # build the env create command
         install_cmd = [
@@ -410,15 +395,15 @@ class Install(object):
             'python{}'.format(PYTHON_REQUIREMENTS),
         ]
 
-        if options.get('force'):
+        if options.get('overwrite_env'):
             install_cmd.append('--force')
 
-        if options.get('install_conda_req'):
-            install_cmd.extend(['--file', options.get('conda_requirements')])
+        #if options.get('install_conda_req'):
+        #    install_cmd.extend(['--file', options.get('conda_requirements')])
 
-        # if force isn't set to replace an existing env,
+        # if overwrite_env isn't set to replace an existing env,
         # then we want to check for the env and fail if exists
-        if not options.get('force'):
+        if not options.get('overwrite_env'):
             if name in \
                     [os.path.basename(env) for env in conda_info['envs']]:
                 raise InstallError(
@@ -433,7 +418,7 @@ class Install(object):
         )
 
         # now we create the env
-        self.vprint(3, subprocess.check_output(install_cmd))
+        subprocess.run(install_cmd, check=True)
         self.env_root = os.path.join(conda_info['sys.prefix'], 'envs', name)
 
         self.vprint(1, 'conda env created at {}'.format(self.env_root))
@@ -441,20 +426,8 @@ class Install(object):
     def install(self, options):
         pip = self.get_pip()
 
-        install_options = options.get('install_options') or []
-
-        if self.settings['ENV'] == 'development' and \
-                'dev' not in install_options:
-            install_options.append('dev')
-
-        install_options = \
-            '[{}]'.format(','.join(
-                [opt for opt in install_options if opt]
-            )) if install_options else ''
-
         cmd = [
-            pip, 'install', '-e',
-            '{}{}'.format(utils.get_project_root(), install_options),
+            pip, 'install', '-e', utils.get_project_root(),
         ]
 
         self.vprint(
@@ -463,7 +436,7 @@ class Install(object):
             '{}'.format(cmd)
         )
 
-        self.vprint(3, subprocess.check_output(cmd))
+        subprocess.run(cmd, check=True)
 
     def get_pip(self):
         if hasattr(self, 'env_root'):
@@ -474,11 +447,12 @@ class Install(object):
     def print_conf(self):
         if self.verbosity < 2:
             return
-        print('Using the following configuration settings:')
+        print('Using the following configuration settings:', flush=True)
         for key, val in sorted(self.settings.items()):
-            print("    {} = {}".format(key, val))
+            print("    {} = {}".format(key, val), flush=True)
 
     def vprint(self, level, *args, **kwargs):
+        kwargs['flush'] = True
         if self.verbosity >= level:
             print(*args, **kwargs)
 
@@ -493,7 +467,8 @@ class Install(object):
             ('Unfortunately, the install command must be run '
              'using the project\'s manage.py script instead of '
              'the snodas command. Try running `python manage.py install`{}.'
-             ).format(project_root_message)
+            ).format(project_root_message),
+            flush=True,
         )
 
     def execute(self, *args, **options):
@@ -502,7 +477,7 @@ class Install(object):
             return 1
 
         if options.get('version'):
-            print('snodas version {}'.format(self.get_version()))
+            print('snodas version {}'.format(self.get_version()), flush=True)
             return 2
 
         self.verbosity = options.get('verbosity')
@@ -555,17 +530,16 @@ class Install(object):
         self.vprint(
             1,
             ('\nNext, activate the new conda env for the project:\n\n'
-             '`activate {}`\n\n'
-             '(`source` is required in a sh-like shell).\n\n'
-             'Then, setup any required services for this instance:\n\n:'
+             '`conda activate {}`\n\n'
+             'Then, setup any required services for this instance:\n\n'
              '`snodas createdb [options]  # creates a postgres DB`\n'
              '`snodas setupiis [options]  # creates a site in IIS`\n\n'
              'Once the services are configured, '
-             'you can run a webserver or celery:\n\n'
+             'you can run a webserver:\n\n'
              '`snodas runserver [options]'
              'To learn what options apply to each command, try:\n\n'
              '`snodas help <command>`'
-             ).format(self.settings['INSTANCE_NAME'])
+             ).format(self.settings['PROJECT_NAME'])
         )
 
 
