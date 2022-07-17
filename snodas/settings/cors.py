@@ -5,11 +5,11 @@
 INSTALLED_APPS += ('corsheaders', )
 
 CORS_ORIGIN_WHITELIST = (
-    'ebagis.geog.pdx.edu',
-    'test.ebagis.geog.pdx.edu',
-    'localhost:8000',
-    'localhost:8080',
-    'localhost:3000',
+    'https://ebagis.geog.pdx.edu',
+    'https://test.ebagis.geog.pdx.edu',
+    'http://localhost:8000',
+    'http://localhost:8080',
+    'http://localhost:3000',
 )
 
 # we allow access to everything
