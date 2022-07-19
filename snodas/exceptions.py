@@ -1,5 +1,5 @@
 class SNODASError(Exception):
     pass
 
-class GeoJSONValidationError(SNODASError):
+class GeoJSONValidationError(SNODASError, TypeError):
         pass
