@@ -301,9 +301,9 @@ class Install(object):
     def extract_settings_from_options(self, options):
         settings = {}
 
-        settings['TYPE'] = options.get('deployment_type')
+        settings['DEPLOYMENT_TYPE'] = options.get('deployment_type')
 
-        pyfile = settings['TYPE'] + '.py'
+        pyfile = settings['DEPLOYMENT_TYPE'] + '.py'
         if not os.path.isfile(utils.get_settings_file(pyfile)):
             warnings.warn(
                 'Could not find settings file for env named {}'
