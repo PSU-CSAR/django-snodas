@@ -1,3 +1,5 @@
+import os
+
 from split_settings.tools import optional, include
 
 from ..management.utils import load_conf_file
@@ -5,14 +7,22 @@ from ..management.utils import load_conf_file
 
 conf_settings = load_conf_file()
 
+user_override = os.environ.get('SNODAS_DATABASE_USER')
+password_override = os.environ.get('SNODAS_DATABASE_PASSWORD')
+
 PROJECT_NAME = conf_settings.get('PROJECT_NAME')
 DEPLOYMENT_TYPE = conf_settings.get('DEPLOYMENT_TYPE', 'production')
 
 SECRET_KEY = conf_settings.get('SECRET_KEY')
 
 DATABASE_NAME = conf_settings.get('DATABASE_NAME', PROJECT_NAME)
-DATABASE_USER = conf_settings.get('DATABASE_USER', PROJECT_NAME)
-DATABASE_PASSWORD = conf_settings.get('DATABASE_PASSWORD')
+DATABASE_USER = user_override or conf_settings.get('DATABASE_USER', PROJECT_NAME)
+
+if user_override and not password_override:
+    DATABASE_PASSWORD = None
+else:
+    DATABASE_PASSWORD = password_override or conf_settings.get('DATABASE_PASSWORD')
+
 DATABASE_HOST = conf_settings.get('DATABASE_HOST', None)
 DATABASE_PORT = conf_settings.get('DATABASE_PORT', None)
 
