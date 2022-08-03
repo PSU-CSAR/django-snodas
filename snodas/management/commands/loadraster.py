@@ -109,9 +109,7 @@ class Command(BaseCommand):
         print('Inserting record into database for date {}'.format(date))
         with connection.cursor() as cursor:
             try:
-                pieces = self.table.split('.')
-                cursor.execute('set search_path = %s', (pieces[0],))
-                cursor.copy_from(ftype, pieces[1])
+                cursor.copy_expert(f'copy {self.table} from stdin', ftype)
                 del rasters
             except KeyError as e:
                 raise SNODASError(
