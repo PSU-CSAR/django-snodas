@@ -73,7 +73,7 @@ class Pourpoint:
                 )
 
             kwargs['awdb_id'] = geojson['id']
-            kwargs['name'] = geojson['properties']['name']
+            kwargs['name'] = geojson['properties'].get('nwccname', geojson['properties']['name'])
             kwargs['source'] = geojson['properties']['source']
         except KeyError as e:
             raise GeoJSONValidationError(
