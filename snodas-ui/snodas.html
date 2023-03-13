@@ -1,0 +1,193 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <!--<meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+    <meta name="mobile-web-app-capable" content="yes">-->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <title>NWCC eBAGIS -- AOI Browser</title>
+
+
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.2.0/css/all.css">
+    <link rel="stylesheet" href="./css/base.css">
+    <link rel="stylesheet" href="./css/navbar.css">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.3.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-locatecontrol/v0.43.0/L.Control.Locate.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/css/bootstrap-datepicker.min.css" integrity="sha256-JDBcnYeV19J14isGd3EtnsCQK05d8PczJ5+fvEvBJvI=" crossorigin="anonymous" />
+<link rel="stylesheet" href="./leaflet-groupedlayercontrol/leaflet.groupedlayercontrol.css"/>
+<link rel="stylesheet" href="./css/map.css">
+
+
+    <!--link rel="apple-touch-icon" sizes="76x76" href="assets/img/favicon-76.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="assets/img/favicon-120.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="assets/img/favicon-152.png">
+    <link rel="icon" sizes="196x196" href="assets/img/favicon-196.png"-->
+    <link rel="icon" type="image/x-icon" href="/static/ebagis_ui/images/favicon.ico">
+  </head>
+
+  <body>
+
+
+
+
+    <nav class="navbar navbar-expand-sm navbar-dark fixed-top bg-dark">
+  <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+
+  <a class="navbar-brand" href=/><i class="fas fa-globe-americas" aria-hidden="true"></i> NWCC eBagis</a>
+  <div class="collapse navbar-collapse" id="navbarCollapse">
+    <ul class="navbar-nav mr-auto">
+
+      <li class="nav-item nav-icon ">
+        <a class="nav-link" href=/><i class="fas fa-map-marked-alt" aria-hidden="true"></i> AOI Browser</a>
+      </li>
+
+
+      <li class="nav-item nav-icon active">
+        <a class="nav-link" href=/snodas/><i class="fas fa-snowflake" aria-hidden="true"></i> SNODAS Tools</a>
+      </li>
+
+
+      <li class="nav-item nav-icon ">
+        <a class="nav-link" href=/about/><i class="fas fa-info-circle" aria-hidden="true"></i> About</a>
+      </li>
+
+      <li class="nav-item nav-icon">
+        <a class="nav-link" target="_blank" href="http://webservices.geog.pdx.edu/ebagis/"><i class="fas fa-question-circle" aria-hidden="true"></i> Help</a>
+      </li>
+    </ul>
+
+    <ul class="nav navbar-nav floadt-xs-right">
+
+        <li class="nav-item nav-icon">
+          <a class="nav-link" href=/accounts/signup/><i class="fas fa-user-plus" aria-hidden="true"></i> Sign Up</a>
+        </li>
+        <li class="nav-item nav-icon">
+          <a class="nav-link" href=/accounts/login/><i class="fas fa-user-circle" aria-hidden="true"></i> Sign In</a>
+        </li>
+
+    </ul>
+  </div>
+</nav>
+
+
+    <div id="content" class="container fill">
+
+<div id="sidebar">
+  <div class="sidebar-wrapper" id="features">
+    <div class="card">
+      <div class="card-header card-heading">
+        <h4 class="card-title">
+          SNODAS Tools
+          <button type="button" class="btn btn-sm float-right" id="sidebar-hide-btn"><i class="fa fa-chevron-left"></i></button>
+        </h4>
+      </div>
+    </div>
+    <div class="sidebar-table">
+      <form id="snodas-tiles">
+        <div class="form-group form-check">
+          <input type="checkbox" class="form-check-input mb-3" id="snodas-on" checked>
+          <label class="form-check-label" for="snodas-on">Show SNODAS SWE</label>
+          <div class="input-group date mb-3" id="snodas-tile-date">
+            <div class="input-group-prepend">
+              <button id="calendar-btn" class="btn btn-primary" type="button">
+                <i class="far fa-calendar-alt"></i>
+              </button>
+            </div>
+            <input type="text" class="form-control">
+            <div class="input-group-append">
+              <button id="snodas-refresh" class="btn btn-primary" type="button">
+                <i class="fas fa-chevron-circle-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+      <div id="query-container">
+        <form id="snodas-query">
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<button type="button" class="btn btn-sm float-left hidden" id="sidebar-show-btn"><i class="fa fa-chevron-right"></i></button>
+<div id="map">
+  <div id="loading">
+    <div class="loader"></div>
+  </div>
+</div>
+
+<div class="modal fade" id="aoiModal" tabindex="-1" role="dialog">
+</div>
+
+<div class="modal fade" id="attributionModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button class="close" type="button" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title">
+          Developed by <a href='https://www.pdx.edu/geography/center-for-spatial-analysis-research-csar'>PSU CSAR</a>
+        </h4>
+      </div>
+      <div class="modal-body">
+        <div id="attribution"></div>
+      </div>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+
+<div id='hidden-stuff' hidden>
+  <button class="btn btn-danger" id="snodas-query-point-clear" type="button" data-toggle="button" aria-pressed="false" autocomplete="off">
+    <i class="fas fa-times-circle"></i>
+  </button>
+</div>
+
+<!-- Handlebar templates -->
+<!-- End Handlebar templates -->
+
+    </div>
+
+
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.6/handlebars.min.js"></script>
+
+<script type="text/javascript">
+   var POURPOINT_URL = "https://ebagis.geog.pdx.edu/api/rest/pourpoint-boundaries/";
+</script>
+<script src="https://unpkg.com/leaflet@1.3.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.vectorgrid@latest/dist/Leaflet.VectorGrid.bundled.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/js/bootstrap-datepicker.min.js" integrity="sha256-tW5LzEC7QjhG0CiAvxlseMTs2qJS7u3DRPauDjFJ3zo=" crossorigin="anonymous"></script>
+<script src="https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-locatecontrol/v0.43.0/L.Control.Locate.min.js"></script>
+<script src="./leaflet-groupedlayercontrol/leaflet.groupedlayercontrol.js"></script>
+<!--script src="/static/ebagis_ui/js/Leaflet.VectorGrid.bundled.js"></script-->
+<script src="./js/snodas_map.js"></script>
+    <script src="./js/aoi_map.js"></script>
+
+
+
+
+    <script type="text/javascript">
+        window.setTimeout(function() {
+            $(".alert-autoclose").fadeTo(500, 0).slideUp(500, function(){
+                $(this).remove();
+            });
+        }, 500);
+    </script>
+  </body>
+</html>

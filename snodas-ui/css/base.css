@@ -1,0 +1,190 @@
+html, body {
+  height: 100%;
+  width: 100%;
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+body {
+  padding-top: 48px;
+}
+input[type="radio"], input[type="checkbox"] {
+  margin: 0;
+}
+#hello.button {
+  background-color: #000;
+}
+.hidden {
+  display: none;
+}
+
+.asteriskField {
+  display: none;
+}
+#content {
+  margin-top: 3rem;
+}
+
+.account-form {
+  max-width: 330px;
+  border-radius: 3px;
+  padding: 1rem;
+  border: 1px solid rgba(0,0,0,0.15);
+  background-color: #eee;
+  box-shadow: 0 2px 4px 0 rgba(0,0,0,0.16);
+  margin: 0 auto;
+}
+
+.login input[type="text"] {
+  margin-bottom: -15px;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.login input[type="password"] {
+  margin-bottom: 10px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.login .form-control-label {
+  display: none;
+}
+.password_reset .form-control-label{
+  display: none;
+}
+
+.account-btn {
+  margin-bottom: 8px;
+}
+
+.alert-block ul {
+  padding-left: 1rem;
+  margin-bottom: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.alert-fixed {
+  top: 49px; 
+  left: 0px; 
+  width: 100%;
+  z-index: 9999;
+  border-radius: 0px;
+  margin-top: 0px;
+}
+.no-value {
+  font-style: italic;
+  color: #adadad;
+}
+
+.alert {
+  margin-bottom: 0px;
+}
+#info {
+  border-radius: 3px;
+  padding: 1rem;
+  background-color: #fff;
+}
+
+.vertical-input-group .input-group:first-child {
+    padding-bottom: 0;
+}
+.vertical-input-group .input-group:first-child * {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.vertical-input-group .input-group:last-child {
+    padding-top: 0;
+}
+.vertical-input-group .input-group:last-child * {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+.vertical-input-group .input-group:not(:last-child):not(:first-child) {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+.vertical-input-group .input-group:not(:last-child):not(:first-child) * {
+    border-radius: 0;
+}
+
+/* Emails */
+.verified {
+  color: #00b300;
+}
+
+.unverified {
+  color: #B33A3A;
+}
+.add_email .form-control-label {
+  display: none;
+}
+
+.primary {
+  color: gold;
+  -webkit-text-stroke-width: 1px;
+  -webkit-text-stroke-color: orange;
+}
+
+.btn:disabled {
+  cursor: default;
+}
+
+.email_list {
+  padding-bottom: .25rem;
+}
+
+.email-btn-group {
+  padding-right: .25rem
+}
+
+/* Max width of verified icon */
+.fa-times.unverified {
+  width: 14px;
+}
+
+/* Requests */
+.gray-box {
+  border-radius: 3px;
+  padding: 1rem;
+  border: 1px solid rgba(0,0,0,0.15);
+  background-color: #eee;
+  box-shadow: 0 2px 4px 0 rgba(0,0,0,0.16);
+  margin: 1rem auto;
+}
+
+.requests {
+  margin-bottom: 2rem;
+  margin-top: 2rem;
+}
+
+.success {
+  color: #00b300;
+}
+
+.fail {
+  color: #B33A3A;
+}
+
+.btn-refresh {
+  padding: 0;
+}
+.refresh-icon {
+  color: #ddd;
+}
+
+.refresh-icon:hover {
+  color: #aaa;
+}
+/* Profile Page */
+.white-box {
+  background-color: #fff;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.email-wrapper {
+  margin-top: 1rem;
+}
+
+.thead-inverse th {
+  background-color: #4f4f4f;
+}
