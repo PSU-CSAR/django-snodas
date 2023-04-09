@@ -18,7 +18,7 @@ class Command(BaseCommand):
     help = """Creates a postgresql database for using the
     settings defined for the current instance of the project."""
 
-    requires_system_checks = False
+    requires_system_checks = []
     can_import_settings = True
 
     def add_arguments(self, parser):

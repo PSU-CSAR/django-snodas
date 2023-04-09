@@ -34,7 +34,7 @@ class Command(BaseCommand):
     help = """Run a regression analysis to compare a
     SNODAS variable on a given date to streamflow."""
 
-    requires_system_checks = False
+    requires_system_checks = []
     can_import_settings = True
 
     cols = snodas_variables
