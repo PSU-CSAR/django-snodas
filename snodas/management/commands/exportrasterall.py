@@ -106,7 +106,7 @@ class Command(BaseCommand):
     Simply provide the path to a SNODAS daily tarfile
     and this command will do the rest."""
 
-    requires_system_checks = False
+    requires_system_checks = []
     can_import_settings = True
 
     table = 'snodas.raster'

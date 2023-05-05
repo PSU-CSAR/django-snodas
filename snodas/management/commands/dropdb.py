@@ -13,7 +13,7 @@ class Command(BaseCommand):
     help = """Drops a postgresql database for this snodas instance using
     the settings defined for the current instance of the project."""
 
-    requires_system_checks = False
+    requires_system_checks = []
     can_import_settings = True
 
     def add_arguments(self, parser):

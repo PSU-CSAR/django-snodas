@@ -553,7 +553,7 @@ class Install(object):
 class Command(BaseCommand):
     help = Install.help
 
-    requires_system_checks = False
+    requires_system_checks = []
 
     def create_parser(self, prog_name, subcommand):
         """

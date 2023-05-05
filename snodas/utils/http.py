@@ -13,13 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 def stream_file(filelike, filename, request, content_type):
-
-    try:
-        file_size = len(filelike)
-    except TypeError:
-        file_size = sys.getsizeof(filelike)
-
     start, end = 0, None
+    file_size = filelike.seek(0,2)
 
     if "HTTP_RANGE" in request.META:
         try:
