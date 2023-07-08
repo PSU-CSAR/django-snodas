@@ -140,6 +140,9 @@ class Command(BaseCommand):
             connection.autocommit = True
             with connection.cursor() as cursor:
                 # let's add the extenions that require superuser permissions
+                # pg_tms cascade tries to setup postgis, but doesn't work with >=3.x
+                # so we explicitly install the raster extension as a workaround
+                cursor.execute('CREATE EXTENSION postgis_raster CASCADE')
                 cursor.execute('CREATE EXTENSION pg_tms CASCADE')
                 cursor.execute('CREATE EXTENSION btree_gist')
         finally:
