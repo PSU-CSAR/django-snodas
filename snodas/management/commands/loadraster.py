@@ -29,7 +29,7 @@ class Command(BaseCommand):
     Simply provide the path to a SNODAS daily tarfile
     and this command will do the rest."""
 
-    requires_system_checks = False
+    requires_system_checks = []
     can_import_settings = True
 
     table = 'snodas.raster'
@@ -109,7 +109,7 @@ class Command(BaseCommand):
         print('Inserting record into database for date {}'.format(date))
         with connection.cursor() as cursor:
             try:
-                cursor.copy_from(ftype, self.table)
+                cursor.copy_expert(f'copy {self.table} from stdin', ftype)
                 del rasters
             except KeyError as e:
                 raise SNODASError(

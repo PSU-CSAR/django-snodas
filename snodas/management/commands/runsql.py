@@ -54,7 +54,7 @@ class Command(BaseCommand):
     if has_bz2:
         readers['.bz2'] = (bz2.BZ2File, 'r')
 
-    requires_system_checks = False
+    requires_system_checks = []
 
     def add_arguments(self, parser):
         super(Command, self).add_arguments(parser)

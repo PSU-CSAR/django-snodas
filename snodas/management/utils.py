@@ -63,30 +63,6 @@ def get_project_root():
     return os.path.join(*destruct_path(SETTINGS_DIR)[:-2])
 
 
-def get_instance_name():
-    try:
-        # path should look something like
-        # d:\development\snodas_dev\django-snodas\snodas\settings
-        # which should be split into separate elements in a list
-        # the instance name is 5th from the end (snodas_dev)
-        return destruct_path(SETTINGS_DIR)[-4]
-    except IndexError:
-        # path was too short and we couldn't get anything from it
-        return None
-
-
-def get_env_name():
-    try:
-        # path should look something like
-        # d:\development\snodas_dev\django-snodas\snodas\settings
-        # which should be split into separate elements in a list
-        # the instance name is 6th from the end (development)
-        return destruct_path(SETTINGS_DIR)[-5]
-    except IndexError:
-        # path was too short and we couldn't get anything from it
-        return None
-
-
 def get_settings_file(file_name=None):
     if file_name:
         return os.path.join(

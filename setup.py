@@ -2,7 +2,7 @@
 from setuptools import setup, find_packages
 
 
-PYTHON_REQUIREMENTS = '=>3.6'
+PYTHON_REQUIREMENTS = '>=3.10'
 
 
 def get_readme():
@@ -43,13 +43,12 @@ def main():
         ''',
         python_requires=PYTHON_REQUIREMENTS,
         install_requires=[
-            'psycopg2-binary>=2.7.1',
-            'Django>=2.1',
-            'GDAL>=2.1.0',
-            'django-split-settings>=0.3.0',
-            'pyyaml>=3.12',
-            'django-cors-headers>=2.4.0',
-            'sqlparse>=0.2.4',
+            'psycopg2-binary~=2.9.3',
+            'Django~=4.0',
+            'django-split-settings~=1.1',
+            'pyyaml~=6.0',
+            'django-cors-headers~=3.13',
+            'sqlparse~=0.4.2',
         ],
         extras_require={
         },

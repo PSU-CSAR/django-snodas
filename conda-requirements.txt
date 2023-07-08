@@ -1,2 +1,1 @@
-numpy>=1.9.2
-gdal>=2.1.0
+libgdal=3.0.2

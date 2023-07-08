@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  db:
+    build: .
+    restart: always
+    environment:
+      - POSTGRES_USER=${PGUSER:-postgres}
+      - POSTGRES_PASSWORD=${PGPASSWORD:-password}
+    ports:
+      - '${PGPORT:-5432}:5432'
