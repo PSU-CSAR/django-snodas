@@ -64,3 +64,35 @@ insert into pourpoint.statistics
     and p.valid_dates @> s.date
 ;
 ```
+
+## Updating a particular statistic
+
+To see how a statistic is calculated, view the `calc_stats_1` function:
+
+```sql
+\sf pourpoint.calc_stats_1
+```
+
+To update a statistic, take the relevant calculation from that function and use
+it in an update statement, such as the following example that recalculates
+percent snow cover for all rows:
+
+```sql
+update
+  pourpoint.statistics as t
+set
+  snowcover = ST_Count(ST_Reclass(
+      ST_MapAlgebra(p.rast, s.swe, '[rast1]*[rast2]', NULL, 'FIRST'),
+      1,
+      '[-32768-0]:0, (0-32767]:1',
+      '1BB',
+      0
+    ))::float / ST_Count(p.rast) * 100
+from
+  pourpoint.rasterized as p,
+  snodas.raster as s
+where
+  p.rasterized_id = t.rasterized_id
+  and s.date = t.date
+;
+```
