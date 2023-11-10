@@ -61,7 +61,7 @@ REST_ROOT = ""
 
 STATIC_URL = '/static/'
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATICFILES_DIRS = (os.path.join(BASE_DIR, 'snodas-ui'),)
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 SITE_STATIC_ROOT = os.path.join(BASE_DIR, 'local_static')

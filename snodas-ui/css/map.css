@@ -1,0 +1,222 @@
+html, body, #content {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.1;
+  padding: 0px;
+  margin-top: 0px;
+}
+body {
+  padding-top: 48px;
+}
+#sidebar {
+  display: block;
+  width: 300px;
+  height: 100%;
+  max-width: 100%;
+  float: left;
+  border-right: 1px solid rgba(0,0,0,.125);
+}
+#map {
+  width: auto;
+  height: 100%;
+}
+
+.fill
+{
+    min-height: 100%;
+    height: 100%;
+    width: 100%;
+    max-width: 100%;
+}
+
+.loader {
+    border: 16px solid #f3f3f3;
+    border-top: 16px solid #232323;
+    border-radius: 50%;
+    width: 120px;
+    height: 120px;
+    animation: spin 2s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+#loading {
+  position: absolute;
+  width: 220px;
+  height: 19px;
+  top: 50%;
+  left: 50%;
+  margin: -10px 0 0 -110px;
+  z-index: 20001;
+}
+#features {
+  margin: 0px;
+  border: none;
+  border-radius: 0px;
+  -webkit-box-shadow: none;
+    box-shadow: none;
+}
+#sidebar-hide-btn {
+  margin-top: -1px;
+  padding: 3px 6px 3px 6px;
+}
+#sidebar-show-btn.btn {
+  height: 100%;
+  border-radius: 0px;
+  padding-left: 0px;
+  padding-right: 1px;
+}
+#sidebar-hide-btn:hover {
+  background-color: rgb(210,210,210);
+}
+#sidebar-show-btn.btn:hover {
+  background-color: rgb(210,210,210);
+}
+.form-check-input {
+  position: relative;
+}
+.zoom-to-pp {
+  margin-top: -.1rem;
+  padding: .2rem;
+  background-color: #f7f7f9;
+  border-color: #f7f7f9;
+}
+.white {
+  color: #FFFFFF;
+}
+.card-title {
+  margin: 0rem;
+}
+.card {
+  border: 0px;
+  border-radius: 0rem;
+}
+.card-body {
+  padding: .75rem;
+  border-bottom: 1px solid rgba(0,0,0,.125);
+}
+.feature-row .card-body {
+  padding:0px;
+}
+.card-header {
+  padding-left: .75rem;
+  padding-right: .75rem;
+}
+#feature-list{
+  width: 100%;
+}
+#feature-list .row{
+  padding-right: 1rem;
+}
+.clear-btn {
+  padding: 1rem;
+}
+.aoi-row {
+  cursor: pointer;
+}
+.feature-row {
+  width: 100%;
+}
+.sidebar-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.sidebar-table {
+  position: absolute;
+  width: 100%;
+  top: 103px;
+  bottom: 0px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.fa-info-circle {
+  padding: 0em 0em 0em 0em;
+}
+.list-group-item {
+  display: inline;
+}
+.pourpoint-header:focus, .pourpoint-header:hover {
+  background: #DCDCDC;
+}
+
+.feature-row > a:first-of-type {
+  text-decoration: none !important;
+}
+/* border around leaflet tile bounds
+.leaflet-tile {
+  border: solid black 5px;
+}
+*/
+.leaflet-control-layers {
+  overflow: auto;
+}
+.leaflet-control-layers label {
+  font-weight: normal;
+  margin-bottom: 0px;
+}
+.leaflet-control-layers-list input[type="radio"], input[type="checkbox"] {
+  margin: 2px;
+}
+.table {
+  margin-bottom: 0px;
+}
+.typeahead {
+  background-color: #FFFFFF;
+}
+.tt-dropdown-menu {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px 4px 4px 4px;
+  /*box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);*/
+  margin-top: 4px;
+  padding: 4px 0;
+  width: 100%;
+  max-height: 300px;
+  overflow: auto;
+}
+.tt-suggestion {
+  font-size: 14px;
+  line-height: 20px;
+  padding: 3px 10px;
+}
+.tt-suggestion.tt-cursor {
+  background-color: #0097CF;
+  color: #FFFFFF;
+  cursor: pointer;
+}
+.tt-suggestion p {
+  margin: 0;
+}
+.tt-suggestion + .tt-suggestion {
+  border-top: 1px solid #ccc;
+}
+.typeahead-header {
+  margin: 0 5px 5px 5px;
+  padding: 3px 0;
+  border-bottom: 2px solid #333;
+}
+.has-feedback .form-control-feedback {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: block;
+  width: 34px;
+  height: 34px;
+  line-height: 34px;
+  text-align: center;
+}
+@media (max-width: 992px) {
+  .navbar .navbar-brand {
+    font-size: 1.78em;
+  }
+}
+/* Print Handling */
+@media print {
+  .leaflet-control-container {
+    display: none !important;
+  }
+}
