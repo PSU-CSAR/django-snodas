@@ -6,6 +6,7 @@ INSTALLED_APPS += ('corsheaders', )
 
 CORS_ALLOWED_ORIGINS = (
     'https://ebagis.geog.pdx.edu',
+    'https://snodas.geog.pdx.edu',
     'https://test.ebagis.geog.pdx.edu',
     'http://localhost:8000',
     'http://localhost:8080',
