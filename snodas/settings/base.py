@@ -23,7 +23,6 @@ INSTALLED_APPS = (
 
     # django libs
     'django.contrib.gis',
-    'django.contrib.staticfiles',
 )
 
 MIDDLEWARE = (
@@ -58,19 +57,6 @@ AUTH_USER_MODEL = 'auth.User'
 ## URL PATH SETTINGS
 # settings for rest framework
 REST_ROOT = ""
-
-STATIC_URL = '/static/'
-
-STATICFILES_DIRS = (os.path.join(BASE_DIR, 'snodas-ui'),)
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
-
-SITE_STATIC_ROOT = os.path.join(BASE_DIR, 'local_static')
-ADMIN_MEDIA_PREFIX = '/static/admin/'
-
-STATICFILES_FINDERS = (
-    'django.contrib.staticfiles.finders.FileSystemFinder',
-    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-)
 
 MIGRATION_MODULES = {
     'sites': 'snodas.fixtures.sites_migrations',

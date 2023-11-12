@@ -41,34 +41,8 @@ from django.contrib.staticfiles.management.commands import collectstatic
 from ..utils import get_project_root
 
 
-MAX_CONTENT_LENGTH = 2**30
-
-TOUCH_FILE_NAME = 'touch_this_file_to_update_cgi.txt'
-TOUCH_FILE = os.path.join(get_project_root(), TOUCH_FILE_NAME)
-
 CONFIG_FILE_NAME = 'generated.web.config'
 WAITRESS_SERVER = 'run_waitress_server.py'
-
-STATIC_CONFIG = os.path.join(settings.STATIC_ROOT, CONFIG_FILE_NAME)
-STATIC_CONFIG_STRING = \
-'''<?xml version="1.0" encoding="UTF-8"?>
-<configuration>
-  <system.webServer>
-    <!-- this configuration overrides the FastCGI handler to let IIS serve the static files -->
-    <handlers>
-    <clear/>
-      <add name="StaticFile" path="*" verb="*" modules="StaticFileModule" resourceType="File" requireAccess="Read" />
-    </handlers>
-  </system.webServer>
-</configuration>
-'''
-
-#     <security>
-#      <requestFiltering>
-#        <requestLimits maxAllowedContentLength="{{  }}"/>
-#      </requestFiltering>
-#    </security>
-#                <environmentVariable name="PYTHONPATH" value="{{ project_dir }}" />
 
 WEB_CONFIG_STRING = \
 '''<?xml version="1.0" encoding="UTF-8"?>
@@ -93,9 +67,6 @@ WEB_CONFIG_STRING = \
             <environmentVariables>
                 <environmentVariable name="PORT" value="%HTTP_PLATFORM_PORT%" />
             </environmentVariables>
-            <recycleOnFileChange>
-                <file path=".\{{ touch_file_name }}"/>
-            </recycleOnFileChange>
         </httpPlatform>
     </system.webServer>
 </configuration>
@@ -126,12 +97,6 @@ class Command(BaseCommand):
             dest='delete',
             default=False,
             help='Deletes the configuration instead of creating it',
-        )
-        parser.add_argument(
-            '--max-content-length',
-            dest='maxContentLength',
-            default=MAX_CONTENT_LENGTH,
-            help='Maximum allowed request content length size',
         )
         parser.add_argument(
             '--site-name',
@@ -180,7 +145,6 @@ class Command(BaseCommand):
         self.conda_exe = os.path.join(os.path.dirname(os.path.dirname(self.conda_env_path)), 'Scripts', 'conda.exe')
 
         self.waitress_server = WAITRESS_SERVER
-        self.touch_file_name = TOUCH_FILE_NAME
         self.last_command_error = None
 
         if not (os.path.isfile(self.conda_exe) and os.access(self.conda_exe, os.X_OK)):
@@ -200,23 +164,6 @@ class Command(BaseCommand):
         self.last_command_error = out if not result else None
         return result
 
-    def remove_touch_file(self):
-        os.remove(TOUCH_FILE)
-
-    def create_touch_file(self):
-        with open(TOUCH_FILE, 'w') as f:
-            f.write('')
-
-    def remove_static_config(self):
-        os.remove(STATIC_CONFIG)
-
-    def setup_static_assets(self):
-        # get the static assets to setup proj and create static dir
-        management.call_command(collectstatic.Command(), verbosity=0)
-        # place the IIS conf file in the static dir
-        with open(STATIC_CONFIG, 'w') as f:
-            f.write(STATIC_CONFIG_STRING)
-
     def set_project_permissions(self):
         # set permissions on the root project directory for the IIS site user
         cmd = ['ICACLS', get_project_root(), '/t', '/grant',
@@ -231,24 +178,6 @@ class Command(BaseCommand):
             raise CommandError(
                 'A web site configuration already exists in [%s] !' % self.project_dir,
             )
-
-        # now getting static files directory and URL
-        static_dir = os.path.normcase(
-            os.path.abspath(getattr(settings, 'STATIC_ROOT', ''))
-        )
-        static_url = getattr(settings, 'STATIC_URL', '/static/')
-
-        static_match = re.match('^/([^/]+)/$', static_url)
-        if static_match:
-            static_is_local = True
-            static_name = static_match.group(1)
-            static_needs_virtual_dir = static_dir != \
-                os.path.join(self.project_dir, static_name)
-        else:
-            static_is_local = False
-
-        if static_dir == self.project_dir and static_is_local:
-            raise CommandError('The site directory cannot be the same as the static directory')
 
         # create web.config
         if not options['skip_config']:
@@ -300,13 +229,6 @@ class Command(BaseCommand):
                         'Setting the logging directory has failed with the following message :\n%s' % self.last_command_error
                      )
 
-            maxContentLength = options['maxContentLength']
-            if not self.run_config_command('set', 'config', '%s' % site_name, '/section:requestfiltering',
-                                           '/requestlimits.maxallowedcontentlength:' + str(maxContentLength)):
-                raise CommandError(
-                    'Setting the maximum content length has failed with the following message :\n%s' % self.last_command_error
-                )
-
     def delete(self, args, options):
         if not os.path.exists(self.web_config) and not options['skip_config']:
             raise CommandError('A web site configuration does not exists in [%s] !' % self.project_dir)
@@ -339,12 +261,8 @@ class Command(BaseCommand):
             )
 
         if options['delete']:
-            self.remove_static_config()
-            self.remove_touch_file()
             self.delete(args, options)
         else:
-            self.setup_static_assets()
-            self.create_touch_file()
             self.install(args, options)
             self.set_project_permissions()
             print('''
