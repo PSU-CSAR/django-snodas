@@ -40,7 +40,7 @@ main () {
 
     cd "${THIS_DIR}/.."
 
-    local compile="pip-compile --strip-extras --generate-hashes --allow-unsafe"
+    local compile="pip-compile --strip-extras --allow-unsafe"
 
     $compile pyproject.toml "$@"
 

@@ -1,5 +1,7 @@
 import os
 
+from pathlib import Path
+
 from split_settings.tools import include, optional
 
 from ..management.utils import load_conf_file
@@ -26,6 +28,7 @@ DATABASE_HOST = conf_settings.get('DATABASE_HOST', None)
 DATABASE_PORT = conf_settings.get('DATABASE_PORT', None)
 
 SITE_DOMAIN_NAME = conf_settings.get('SITE_DOMAIN_NAME', None)
+SNODAS_RASTERDB = Path(conf_settings.get('SNODAS_RASTERDB')).resolve()
 SUBDOMAINS = conf_settings.get('SUBDOMAINS', [])
 
 
