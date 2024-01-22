@@ -1,10 +1,15 @@
+from io import StringIO
+
 from django.conf import settings
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
 from django.urls import path, reverse
-from ninja import NinjaAPI
+from ninja import NinjaAPI, Query
 from ninja.errors import HttpError
+from ninja.responses import Response
 
 from snodas import types
+from snodas.snodas.fileinfo import Product
+from snodas.utils.http import stream_file
 from snodas.views import (
     pourpoints,
     stats,
@@ -156,7 +161,7 @@ def get_pourpoint_by_triplet(
 
 
 @api.get(
-    '/pourpoints/{pourpoint_id}/stats/date-range',  # /{start_date}/{end_date}/',
+    '/pourpoints/{pourpoint_id}/stats/date-range',
     response=types.PourPointStats,
     exclude_none=True,
 )
@@ -192,7 +197,7 @@ def id_stat_range_query(
 
 
 @api.get(
-    '/pourpoints/{pourpoint_id}/stats/doy',  # /{month}/{day}/{start_year}/{end_year}/',
+    '/pourpoints/{pourpoint_id}/stats/doy',
     response=types.PourPointStats,
     exclude_none=True,
 )
@@ -229,6 +234,123 @@ def id_stat_doy_query(
             query,
         ),
     ).build_links(request, api)
+
+
+def zonal_stats(
+    request: HttpRequest,
+    pourpoint_id: int,
+    query: types.PourPointQuery,
+    products: Query[list[Product]],
+    elevation_band_step_ft: int = 1000,
+) -> HttpResponse | StreamingHttpResponse:
+    # deduplicate products
+    products = list(set(products))
+
+    pourpoint = pourpoints.get_point(pourpoint_id).build_links(
+        request,
+        api,
+    )
+
+    if not pourpoint.properties.area_meters:
+        raise HttpError(
+            status_code=409,
+            message='Pourpoint does not have an AOI polygon',
+        )
+
+    results = stats.get_pourpoint_zonal_stats(
+        pourpoint.properties.station_triplet,
+        query,
+        products,
+        elevation_band_step_feet=elevation_band_step_ft,
+    )
+
+    # default to application/json, even if not explicitly accepted
+    # only fall down to csv if it is accepted and json is not
+    # have to check it first for Accepts values like */*
+    if request.accepts('application/json') or not request.accepts('text/csv'):
+        return Response(
+            types.PourPointZonalStats(
+                pourpoint=pourpoint,
+                products=products,
+                query=query,
+                results=results.dump(),
+            )
+            .build_links(
+                request,
+                api,
+            )
+            .model_dump(
+                exclude_unset=True,
+                exclude_none=True,
+            ),
+        )
+
+    flike = StringIO()
+    results.dump_to_csv(flike)
+    return stream_file(
+        flike,
+        query.csv_name(pourpoint.properties.name),
+        request,
+        'text/csv',
+    )
+
+
+@api.get(
+    '/pourpoints/{pourpoint_id}/zonal-stats/date-range',
+    exclude_none=True,
+    exclude_unset=True,
+)
+def zonal_stat_range_query(
+    request: HttpRequest,
+    pourpoint_id: int,
+    products: Query[list[Product]],
+    start_date: types.Date,
+    end_date: types.Date,
+    elevation_band_step_ft: int = 1000,
+) -> HttpResponse | StreamingHttpResponse:
+    query = types.DateRangeQuery(
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    return zonal_stats(
+        request,
+        pourpoint_id,
+        query,
+        products,
+        elevation_band_step_ft,
+    )
+
+
+@api.get(
+    '/pourpoints/{pourpoint_id}/zonal-stats/doy',
+    exclude_none=True,
+    exclude_unset=True,
+)
+def zonal_stat_doy_query(
+    request: HttpRequest,
+    pourpoint_id: int,
+    products: Query[list[Product]],
+    month: types.Month,
+    day: types.Day,
+    start_year: types.Year = 2004,
+    end_year: types.Year = 9999,
+    elevation_band_step_ft: int = 1000,
+) -> HttpResponse | StreamingHttpResponse:
+    query = types.DOYQuery(
+        month=month,
+        day=day,
+        start_year=start_year,
+        end_year=end_year,
+    )
+
+    return zonal_stats(
+        request,
+        pourpoint_id,
+        query,
+        products,
+        elevation_band_step_ft,
+    )
 
 
 # legacy query endpoints for UI

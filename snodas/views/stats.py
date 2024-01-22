@@ -1,15 +1,30 @@
+from collections.abc import Iterable
 from io import BytesIO
 from typing import assert_never
 
+from django.conf import settings
 from django.db import connection
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 
 from snodas import types
 from snodas.queries import streamflow  # type: ignore
+from snodas.snodas.db import get_raster_database
+from snodas.snodas.fileinfo import Product
+from snodas.snodas.raster import (
+    AOIRaster,
+    AOIRasterWithArea,
+)
+from snodas.snodas.raster_collection import RasterCollection
+from snodas.snodas.zonal_stats import ZonalStats
 from snodas.utils.http import stream_file
 
 
-def raw_stat_query_csv(request, cursor, filename, stat_query):
+def raw_stat_query_csv(
+    request,
+    cursor,
+    filename,
+    stat_query,
+) -> HttpResponse | StreamingHttpResponse:
     flike = BytesIO()
     csvquery = (
         f'COPY ({stat_query.as_string(cursor.connection)}) TO STDOUT WITH CSV HEADER'
@@ -37,6 +52,28 @@ def get_pourpoint_stats(
         return [
             types.SnodasStats(**dict(zip(columns, row, strict=False))) for row in rows
         ]
+
+
+def get_pourpoint_zonal_stats(
+    station_triplet: types.StationTriplet,
+    query: types.DateQuery,
+    products: Iterable[Product],
+    elevation_band_step_feet: int = 1000,
+) -> ZonalStats:
+    rasterdb = get_raster_database(settings.SNODAS_RASTERDB)
+    aoi = AOIRasterWithArea.from_aoi_raster(
+        AOIRaster.open(rasterdb.aoi_raster_path_from_triplet(station_triplet)),
+        rasterdb.area_raster(),
+    )
+    snodas_rasters = RasterCollection.from_products_query(
+        products=set(products),
+        query=query,
+    )
+    return ZonalStats.calculate(
+        aoi,
+        snodas_rasters,
+        elevation_band_step_feet,
+    )
 
 
 def get_csv_statistics(
