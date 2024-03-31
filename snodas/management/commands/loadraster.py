@@ -130,18 +130,22 @@ class Command(BaseCommand):
             raise SNODASError('File ext {} is unknown'.format(ext))
 
         info = re.match(
-            (r'(?P<region>[a-z]{2})_'
-             r'(?P<model>[a-z]{3})'
-             r'(?P<datatype>v\d)'
-             r'(?P<product_code>\d{4})'
-             r'(?P<scaled>S?)'
-             r'(?P<vcode>[a-zA-Z]{2}[\d_]{2})'
-             r'(?P<timecode>[AT]00[02][14])'
-             r'TTNATS'
-             r'(?P<date>\d{8})'
-             r'(?P<hour>\d{2})'
-             r'(?P<interval>H|D)'
-             r'(?P<offset>P00[01])'),
+            (
+                r'^'
+                r'(?P<region>[a-z]{2})_'
+                r'(?P<model>[a-z]{3})'
+                r'(?P<datatype>v\d)'
+                r'(?P<product_code>\d{4})'
+                r'(?P<scaled>S?)'
+                r'(?P<vcode>[a-zA-Z]{2}[\d_]{2})'
+                r'(?P<timecode>[AT]00[02][14])'
+                r'TTNATS'
+                r'(?P<date>\d{8})'
+                r'(?P<hour>\d{2})'
+                r'(?P<interval>H|D)'
+                r'(?P<offset>P00[01])'
+                r'$'
+            ),
             name,
         ).groupdict()
 
@@ -235,7 +239,7 @@ class Command(BaseCommand):
     @staticmethod
     def validate_raster_dates(rasters):
         dates = set()
-        for key, raster in rasters.items():
+        for raster in rasters.values():
             dates.add(raster['info'].date)
 
         if len(dates) > 1:
