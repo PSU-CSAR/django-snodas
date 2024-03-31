@@ -29,7 +29,7 @@ def validate_geojson(geom):
     return geom
 
 
-def raw_stat_query(request, cursor, filename, stat_query):
+def raw_stat_query_csv(request, cursor, filename, stat_query):
     flike = BytesIO()
     csvquery = "COPY ({}) TO STDOUT WITH CSV HEADER".format(stat_query.as_string(cursor.connection))
     cursor.copy_expert(csvquery, flike)
@@ -40,6 +40,28 @@ def raw_stat_query(request, cursor, filename, stat_query):
             request,
             'text/csv',
         )
+
+
+def raw_stat_query_json(cursor, stat_query) -> HttpResponse:
+    query: str = '''
+        SELECT jsonb_object_agg(
+          stats.date, stats
+        )::text
+        FROM ({}) as stats
+    '''.format(stat_query.as_string(cursor.connection))
+
+    print(query)
+
+    cursor.execute(query)
+    row: Unknown = cursor.fetchone()
+
+    if not row:
+        return HttpResponse(status=204)
+
+    return HttpResponse(
+        row[0],
+        content_type='application/json',
+    )
 
 
 def get_raw_statistics_pourpoint(request, query_type, pourpoint_id,
@@ -101,7 +123,10 @@ ORDER BY
                     name=name,
                 )
 
-        return raw_stat_query(request, cursor, name, stat_query)
+        if request.accepts('text/csv'):
+            return raw_stat_query_csv(request, cursor, name, stat_query)
+
+        return raw_stat_query_json(cursor, stat_query)
 
 
 def get_raw_statistics_pourpoint_date(request, query_type, pourpoint_id, month,
@@ -162,7 +187,10 @@ ORDER BY
                     end_year,
                 )
 
-        return raw_stat_query(request, cursor, name, stat_query)
+        if request.accepts('text/csv'):
+            return raw_stat_query_csv(request, cursor, name, stat_query)
+
+        return raw_stat_query_json(cursor, stat_query)
 
 
 def get_raw_statistics_feature(request, start_date, end_date, lat, long, name=None):
