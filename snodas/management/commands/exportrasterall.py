@@ -334,7 +334,7 @@ class Command(BaseCommand):
         def create_variable(name, longname, units):
             var = ds.createVariable(
                 name,
-                'i2,
+                'i2',
                 (self.interval, 'lat', 'lon'),
                 zlib=True,
                 complevel=9,
