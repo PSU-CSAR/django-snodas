@@ -1,8 +1,11 @@
 import json
 import logging
+from typing import Literal
 
 from django.db import connection
 from django.http import HttpResponse
+
+from snodas import types
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +69,14 @@ FROM (
     return HttpResponse(dates, content_type='application/json')
 
 
-def get_tile(request, date, zoom, x, y, format):
+def get_tile(
+    request,
+    date: types.Date,
+    zoom: types.Zoom,
+    x: int,
+    y: int,
+    format: Literal['png', 'jpg', 'jpeg'],
+):
     if request.method != 'GET':
         return HttpResponse(reason="Not allowed", status=405)
 

@@ -145,6 +145,7 @@ class Command(BaseCommand):
                 cursor.execute('CREATE EXTENSION postgis_raster CASCADE')
                 cursor.execute('CREATE EXTENSION pg_tms CASCADE')
                 cursor.execute('CREATE EXTENSION btree_gist')
+                cursor.execute('CREATE EXTENSION tablefunc')
         finally:
             try:
                 connection.close()

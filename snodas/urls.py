@@ -1,144 +1,274 @@
-from django.urls import include, re_path
+from django.conf import settings
+from django.http import HttpRequest, HttpResponse
+from django.urls import path
 
-from .settings import REST_ROOT, DEBUG, INSTALLED_APPS
+from ninja import NinjaAPI
 
-from .views import snodas_tiles, pourpoints, snodas_stats, snodas_analysis
+from snodas import types
+from snodas.views import (
+    pourpoints,
+    stats,
+    tiles,
+)
 
-from .constants import snodas_variables
+
+api = NinjaAPI()
 
 
-# TODO: change these to be django url convertors
-# see https://docs.djangoproject.com/en/2.1/topics/http/urls/#registering-custom-path-converters
-# url regex patterns
-LAT = r'(\+|-)?(?:90(?:(?:\.0*)?)|(?:[0-9]|[1-8][0-9])(?:(?:\.[0-9]*)?))'
-LONG = r'(\+|-)?(?:180(?:(?:\.0*)?)|(?:[0-9]|[1-9][0-9]|1[0-7][0-9])(?:(?:\.[0-9]*)?))'
-YYYY = r'\d{4}'
-MM = r'(0[1-9]|1[0-2])'
-DD = r'(0[1-9]|[1-2][0-9]|3[0-1])'
-YYYYMMDD = r'{YYYY}-?{MM}-?{DD}'.format(YYYY=YYYY, MM=MM, DD=DD)
-ZOOM = r'[0]?[0-9]|1[0-5]'
-X = r'\d+'
-Y = r'\d+'
-ID = r'\d+'
-SNODAS_VARS = "|".join(snodas_variables)
+# Tile routes
+api.get(
+    '/tiles/',
+    include_in_schema=settings.DEBUG,
+)(tiles.list_dates)
 
-rest_urls = [
-    # find all snodas dates
-    re_path(
-        r'^tiles/$',
-        snodas_tiles.list_dates,
-    ),
+api.get(
+    '/tiles/date-params/',
+    include_in_schema=settings.DEBUG,
+)(tiles.date_params)
 
-    # snodas start, end, and missing dates (legacy)
-    re_path(
-        r'^tiles/date-params$',
-        snodas_tiles.date_params,
-    ),
+api.get(
+    '/tiles/{date}/{zoom}/{x}/{y}.{format}/',
+    include_in_schema=settings.DEBUG,
+)(tiles.get_tile)
 
-    # snodas raster tiles by date
-    re_path(
-        r'^tiles/(?P<date>{DATE})/(?P<zoom>{ZOOM})/(?P<x>{X})/(?P<y>{Y}).(?P<format>png|jpg|jpeg)$'.format(
-            DATE=YYYYMMDD,
-            ZOOM=ZOOM,
-            X=X,
-            Y=Y,
+
+# Pourpoint routes
+@api.get(
+    '/pourpoints/',
+    response=types.PourPoints,
+)
+def get_pourpoints(
+    request: HttpRequest,
+    response: HttpResponse,
+):
+    response['Content-Type'] = 'application/geo+json'
+    return pourpoints.get_points()
+
+@api.get(
+    '/pourpoints/{zoom}/{x}/{y}.mvt',
+    include_in_schema=settings.DEBUG,
+)
+def get_pourpoint_tile(
+    request: HttpRequest,
+    zoom: types.Zoom,
+    x: int,
+    y: int,
+):
+    return HttpResponse(
+        pourpoints.get_tile(zoom, x, y),
+        content_type='application/vnd.mapbox-vector-tile',
+    )
+
+
+# by ID
+@api.get(
+    '/pourpoints/{pourpoint_id}/',
+    response=types.PourPoint,
+)
+def get_pourpoint_by_id(
+    request: HttpRequest,
+    pourpoint_id: int,
+    response: HttpResponse,
+):
+    response['Content-Type'] = 'application/geo+json'
+    return pourpoints.get_point(pourpoint_id)
+
+
+@api.get(
+    '/pourpoints/{pourpoint_id}/stat/{start_date}/{end_date}/',
+    response=types.PourPointStats,
+)
+def id_stat_range_query(
+    request: HttpRequest,
+    pourpoint_id: int,
+    start_date: types.Date,
+    end_date: types.Date,
+) -> types.PourPointStats:
+    pourpoint = pourpoints.get_point(pourpoint_id)
+    query = types.DateRangeQuery(
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return types.PourPointStats(
+        pourpoint=pourpoint,
+        query=query,
+        results=stats.get_pourpoint_stats(
+            pourpoint.id,
+            query,
         ),
-        snodas_tiles.get_tile,
-    ),
+    )
 
-    # pourpoint geojson (points)
-    re_path(
-        r'^pourpoints/$',
-        pourpoints.get_points,
-    ),
 
-    # pourpoint tiles (polygons)
-    re_path(
-        r'^pourpoints/(?P<zoom>{ZOOM})/(?P<x>{X})/(?P<y>{Y}).mvt$'.format(
-            ZOOM=ZOOM,
-            X=X,
-            Y=Y,
+@api.get(
+    '/pourpoints/{pourpoint_id}/stat/{month}/{day}/{start_year}/{end_year}/',
+    response=types.PourPointStats,
+)
+def id_stat_doy_query(
+    request: HttpRequest,
+    pourpoint_id: int,
+    month: types.Month,
+    day: types.Day,
+    start_year: types.Year,
+    end_year: types.Year,
+):
+    pourpoint = pourpoints.get_point(pourpoint_id)
+    query = types.DOYQuery(
+        month=month,
+        day=day,
+        start_year=start_year,
+        end_year=end_year,
+    )
+    return types.PourPointStats(
+        pourpoint=pourpoint,
+        query=query,
+        results=stats.get_pourpoint_stats(
+            pourpoint.id,
+            query,
         ),
-        pourpoints.get_tile,
-    ),
+    )
 
-    # snodas stats raw query for data range by pourpoint
-    re_path(
-        r'^query/pourpoint/(?P<query_type>point|polygon)/(?P<pourpoint_id>{ID})/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
-            ID=ID,
-            DATE=YYYYMMDD,
+
+# by triplet
+@api.get(
+    '/pourpoints/by-triplet/{station_triplet}/',
+    response=types.PourPoint,
+)
+def get_pourpoint_by_triplet(
+    request: HttpRequest,
+    station_triplet: types.StationTriplet,
+    response: HttpResponse,
+):
+    response['Content-Type'] = 'application/geo+json'
+    return pourpoints.get_point(station_triplet)
+
+
+@api.get(
+    '/pourpoints/by-triplet/{station_triplet}/stat/{start_date}/{end_date}/',
+    response=types.PourPointStats,
+)
+def triplet_stat_range_query(
+    request: HttpRequest,
+    station_triplet: types.StationTriplet,
+    start_date: types.Date,
+    end_date: types.Date,
+) -> types.PourPointStats:
+    pourpoint = pourpoints.get_point(station_triplet)
+    query = types.DateRangeQuery(
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return types.PourPointStats(
+        pourpoint=pourpoint,
+        query=query,
+        results=stats.get_pourpoint_stats(
+            pourpoint.id,
+            query,
         ),
-        snodas_stats.get_raw_statistics_pourpoint,
-    ),
+    )
 
-    # snodas stats raw query for doy by pourpoint
-    re_path(
-        r'^query/pourpoint/(?P<query_type>polygon)/(?P<pourpoint_id>{ID})/(?P<month>{MM})-(?P<day>{DD})/(?P<start_year>{YYYY})/(?P<end_year>{YYYY})/$'.format(
-            ID=ID,
-            DD=DD,
-            MM=MM,
-            YYYY=YYYY,
+
+@api.get(
+    '/pourpoints/by-triplet/{station_triplet}/stat/{month}/{day}/{start_year}/{end_year}/',
+    response=types.PourPointStats,
+)
+def triplet_stat_doy_query(
+    request: HttpRequest,
+    station_triplet: types.StationTriplet,
+    month: types.Month,
+    day: types.Day,
+    start_year: types.Year,
+    end_year: types.Year,
+) -> types.PourPointStats:
+    pourpoint = pourpoints.get_point(station_triplet)
+    query = types.DOYQuery(
+        month=month,
+        day=day,
+        start_year=start_year,
+        end_year=end_year,
+    )
+    return types.PourPointStats(
+        pourpoint=pourpoint,
+        query=query,
+        results=stats.get_pourpoint_stats(
+            pourpoint.id,
+            query,
         ),
-        snodas_stats.get_raw_statistics_pourpoint_date,
-    ),
+    )
 
-    # snodas stat raw query for date range by arbitrary feature
-    re_path(
-        r'^query/feature/(?P<lat>{LAT})/(?P<long>{LONG})/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
-            LAT=LAT,
-            LONG=LONG,
-            DATE=YYYYMMDD,
+
+# legacy query endpoints for UI
+@api.get(
+    '/query/pourpoint/polygon/{pourpoint_id}/{start_date}/{end_date}/',
+    include_in_schema=settings.DEBUG,
+)
+def legacy_range_query(
+    request: HttpRequest,
+    pourpoint_id: int,
+    start_date: types.Date,
+    end_date: types.Date,
+):
+    return stats.get_csv_statistics(
+        request,
+        pourpoint_id,
+        types.DateRangeQuery(
+            start_date=start_date,
+            end_date=end_date,
         ),
-        snodas_stats.get_raw_statistics_feature,
-    ),
-    # this would be for a post of a geojson feature, but us not yet implemented
-    #re_path(
-    #    r'^query/feature/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
-    #        DATE=YYYYMMDD,
-    #    ),
-    #    snodas_stats.get_raw_statistics_feature,
-    #),
+    )
 
-    # old stat query endpoint
-    re_path(
-        r"^query/(?P<start_year>{Y})/(?P<end_year>{Y})/(?P<month>{M})/(?P<day>{D})/$".format(
-            Y=YYYY,
-            M=MM,
-            D=DD,
+
+@api.get(
+    '/query/pourpoint/polygon/{pourpoint_id}/{monthday}/{start_year}/{end_year}/',
+    include_in_schema=settings.DEBUG,
+)
+def legacy_doy_query(
+    request: HttpRequest,
+    pourpoint_id: int,
+    monthday: str,
+    start_year: types.Year,
+    end_year: types.Year,
+):
+    month = int(monthday[:2])
+    day = int(monthday[-2:])
+    return stats.get_csv_statistics(
+        request,
+        pourpoint_id,
+        types.DOYQuery(
+            month=month,
+            day=day,
+            start_year=start_year,
+            end_year=end_year,
         ),
-        snodas_stats.get_for_date,
-    ),
+    )
 
-    # export snodas raster in netcdf for aoi
-    #re_path(
-    #    r'^export/pourpoint/(?P<pourpoint_id>{ID})/(?P<variable>{SNODAS_VARS})/(?P<start_date>{DATE})/(?P<end_date>{DATE})/$'.format(
-    #        ID=ID,
-    #        DATE=YYYYMMDD,
-    #        SNODAS_VARS=SNODAS_VARS,
-    #    ),
-    #   snodas_stats.get_raw_statistics_pourpoint,
-    #),
 
-    # streamflow regression query
-    re_path(
-        r'^analysis/streamflow/(?P<variable>{SNODAS_VARS})/(?P<forecast_start>{MM})/(?P<forecast_end>{MM})/(?P<month>{MM})-(?P<day>{DD})/(?P<start_year>{YYYY})/(?P<end_year>{YYYY})/$'.format(
-            SNODAS_VARS=SNODAS_VARS,
-            DD=DD,
-            MM=MM,
-            YYYY=YYYY,
-        ),
-        snodas_analysis.streamflow_regression,
-    ),
-]
+@api.get(
+    '/analysis/streamflow/{snodas_variable}/{forecast_start_month}/{forecast_end_month}/{monthday}/{start_year}/{end_year}/',
+    include_in_schema=settings.DEBUG,
+)
+def streamflow(
+    request: HttpRequest,
+    snodas_variable: types.SnodasVariable,
+    forecast_start_month: types.Month,
+    forecast_end_month: types.Month,
+    monthday: str,
+    start_year: types.Year,
+    end_year: types.Year,
+):
+    month = int(monthday[:2])
+    day = int(monthday[-2:])
+    return stats.streamflow_regression(
+        request,
+        snodas_variable,
+        forecast_start_month,
+        forecast_end_month,
+        month,
+        day,
+        start_year,
+        end_year,
+    )
 
-# standard django url patterns
+
 urlpatterns = [
-    # rest urls
-    re_path(r'^{}'.format(REST_ROOT), include(rest_urls)),
+    path('', api.urls),
 ]
-
-if DEBUG and "debug_toolbar" in INSTALLED_APPS:
-    import debug_toolbar
-    urlpatterns = [
-        re_path(r'^__debug__/', include(debug_toolbar.urls)),
-    ] + urlpatterns
