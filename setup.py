@@ -24,7 +24,7 @@ def main():
 
     setup(
         name='django-snodas',
-        #packages=find_packages(),
+        packages=find_packages(),
         py_modules=['manage'],
         version=version,
         description=(
@@ -43,12 +43,13 @@ def main():
         ''',
         python_requires=PYTHON_REQUIREMENTS,
         install_requires=[
-            'psycopg2-binary~=2.9.3',
-            'Django~=4.0',
-            'django-split-settings~=1.1',
-            'pyyaml~=6.0',
-            'django-cors-headers~=3.13',
-            'sqlparse~=0.4.2',
+            'psycopg2-binary>=2.9.3',
+            'Django>=5.0',
+            'django-split-settings>=1.1',
+            'pyyaml>=6.0',
+            'django-cors-headers>=3.13',
+            'sqlparse>=0.4.2',
+            'pydantic>=2.6.0',
         ],
         extras_require={
         },

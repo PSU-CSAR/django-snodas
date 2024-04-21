@@ -20,7 +20,6 @@ from ...utils.filesystem import tempdirectory
 from ..utils import to_namedtuple, FullPaths, is_file, is_dir, chain_streams
 
 
-AVERAGE_TEMP_REQUIRED = True
 HDR_EXTS = ('.Hdr', '.txt')
 
 
@@ -83,25 +82,13 @@ class Command(BaseCommand):
                     rasters['sublimation_blowing']['raster'],
                     rasters['precip_solid']['raster'],
                     rasters['precip_liquid']['raster'],
+                    # early data have missing average temp
+                    # (and also has a funky undocumented grid)
+                    # but all modern data should have it
+                    rasters['average_temp']['raster'],
             ]
         except KeyError as e:
-            print('ERROR: SNODAS data appears incomplete: {}'.format(str(e)))
-            raise
-
-        try:
-            raster_streams.append(rasters['average_temp']['raster'])
-        except KeyError as e:
-            # early data has aerage temp missing,
-            # (and also has a funky undocumented grid)
-            # but all modern data should have it
-            # we have a hard override just for
-            # this weird histroical accident
-            if AVERAGE_TEMP_REQUIRED:
-                print(
-                    'ERROR: SNODAS data appears incomplete: {}'.format(str(e))
-                )
-                raise
-            raster_streams.append(BytesIO(b'\N'))
+            raise SNODASError('SNODAS data appears incomplete') from e
 
         raster_streams.append(BytesIO(date.encode()))
         ftype = chain_streams(raster_streams, sep=b'\t')
@@ -112,9 +99,7 @@ class Command(BaseCommand):
                 cursor.copy_expert(f'copy {self.table} from stdin', ftype)
                 del rasters
             except KeyError as e:
-                raise SNODASError(
-                    'SNODAS data appears incomplete: {}'.format(str(e)),
-                )
+                raise SNODASError('SNODAS data appears incomplete') from e
 
         print('Processing completed successfully')
 
@@ -129,7 +114,7 @@ class Command(BaseCommand):
         if ext not in HDR_EXTS:
             raise SNODASError('File ext {} is unknown'.format(ext))
 
-        info = re.match(
+        matches = re.match(
             (
                 r'^'
                 r'(?P<region>[a-z]{2})_'
@@ -147,11 +132,12 @@ class Command(BaseCommand):
                 r'$'
             ),
             name,
-        ).groupdict()
+        )
 
-        if not info:
+        if not matches:
             raise SNODASError('Filename could not be parsed: {}'.format(name))
 
+        info = matches.groupdict()
         info['product_code'] = int(info['product_code'])
         info['name'] = name
         return to_namedtuple(info)
@@ -231,7 +217,7 @@ class Command(BaseCommand):
                 self.trim_header(hdr)
                 file_info = self.parse_filename(hdr)
                 rasters[self.snodas_type_from_file_info(file_info)] = {
-                    'raster': BytesIO(to_pgraster(GDALRaster(hdr)).encode()),
+                    'raster': BytesIO(to_pgraster(GDALRaster(hdr)).hex().encode()),
                     'info': file_info
                 }
         return rasters
