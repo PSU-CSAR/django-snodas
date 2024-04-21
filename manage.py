@@ -2,7 +2,6 @@
 import os
 import sys
 import logging
-import datetime
 import logging.handlers
 
 
@@ -14,16 +13,10 @@ LOG_FILE = os.path.join(os.path.dirname(__file__), 'manage.log')
 CONF_FILE = os.path.join(os.path.dirname(__file__), 'project.conf')
 
 
-def activate_help():
-    import yaml
-    with open(CONF_FILE) as f:
-        instance_name = yaml.load(f)['INSTANCE_NAME']
-    return (
-        'ERROR: snodas.settings could not be imported.\n'
-        'It looks like you need to activate the conda environment '
-        'for this instance, which you can do by running '
-        '`activate {}`'.format(instance_name)
-    )
+ACTIVATE_HELP: str = (
+    'ERROR: snodas.settings could not be imported.\n'
+    'It looks like you need to activate the proper conda/virtual environment.'
+)
 
 
 def install(help=False):
@@ -72,13 +65,13 @@ def default_django_command():
     # do some sort of more advanced check of the settings to verify that
     # they match the current project.
     try:
-        import snodas.settings
+        import snodas.settings as _
     except ImportError:
         logger.debug(
             'snodas.settings couldn\'t be imported; '
             'looks like the correct env is not activated'
         )
-        print(activate_help())
+        print(ACTIVATE_HELP)
         return 1
 
     # hacky workaround to allow snodas command to use the
@@ -143,11 +136,9 @@ def main():
     else:
         try:
             return default_django_command()
-        except Exception as e:
-            logger.exception(e)
+        except Exception:
+            logger.exception('Failure running CLI')
             raise
-            # before I was returning -1, but I don't know why anymore
-            return -1
 
 
 if __name__ == "__main__":
