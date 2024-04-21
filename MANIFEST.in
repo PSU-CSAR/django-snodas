@@ -1,3 +1,2 @@
-recursive-include snodas *
-include *.md
-include *.txt
+graft snodas
+global-exclude *.py[cod]

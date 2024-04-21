@@ -30,38 +30,6 @@ except ImportError:
     import utils
 
 
-class remove_const(argparse.Action):
-
-    def __init__(self,
-                 option_strings,
-                 dest,
-                 const,
-                 default=None,
-                 required=False,
-                 help=None,
-                 metavar=None):
-        super(remove_const, self).__init__(
-            option_strings=option_strings,
-            dest=dest,
-            nargs=0,
-            const=const,
-            default=default,
-            required=required,
-            help=help,
-            metavar=metavar)
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        items = argparse._copy.copy(
-            argparse._ensure_value(namespace, self.dest, [])
-        )
-        try:
-            items.remove(self.const)
-        except ValueError:
-            pass
-        else:
-            setattr(namespace, self.dest, items)
-
-
 def is_development(settings):
     return settings['DEPLOYMENT_TYPE'] == 'development'
 
@@ -95,10 +63,6 @@ class Install(object):
     def default_conf_file(self):
         return os.path.join(utils.get_project_root(), utils.CONF_FILE_NAME)
 
-    def get_version(self):
-        from setup import get_version as gv
-        return gv()
-
     def create_parser(self, prog_name, subcommand):
         """
         Create and return the ``ArgumentParser`` which will be used to
@@ -114,11 +78,6 @@ class Install(object):
     @classmethod
     def add_arguments(cls, parser):
         # base options
-        parser.add_argument(
-            '--version',
-            action='store_true',
-            help='Display the version of snodas to be installed then exit.',
-        )
         parser.add_argument(
             '-v',
             '--verbosity',
@@ -278,7 +237,6 @@ class Install(object):
     @classmethod
     def run_from_argv(cls, argv):
         self = cls()
-        self._called_from_command_line = True
         parser = self.create_parser(argv[0], argv[1])
 
         options = parser.parse_args(argv[2:])
@@ -370,14 +328,19 @@ class Install(object):
             'Wrote project conf to config file {}'.format(self.output_file)
         )
 
+    @staticmethod
+    def get_python_version() -> str:
+        import tomllib
+        from pathlib import Path
+        pyproject = tomllib.loads(
+            (Path(utils.get_project_root()) / 'pyproject.toml').read_text()
+        )
+        return pyproject['project']['requires-python']
+
     def create_conda_env(self, options):
         import json
 
-        # if we've gotten here then this class should have
-        # been called from the snodas manage.py, which has
-        # added the root project directory to the path,
-        # and setup.py should be importable
-        from setup import PYTHON_REQUIREMENTS
+        PYTHON_REQUIREMENTS = self.get_python_version()
 
         conda = options.get('conda')
 
@@ -425,19 +388,32 @@ class Install(object):
 
         self.vprint(1, 'conda env created at {}'.format(self.env_root))
 
-    def install(self, options):
+    def install(self):
         pip = self.get_pip()
 
+        # install deps
         cmd = [
-            pip, 'install', '-e', utils.get_project_root(),
+            pip,
+            'install',
+            '-r',
+            os.path.join(utils.get_project_root(), 'requirements.txt'),
         ]
-
         self.vprint(
             2,
             'Processing the following command for install:\n'
             '{}'.format(cmd)
         )
+        subprocess.run(cmd, check=True)
 
+        # install app
+        cmd = [
+            pip, 'install', '-e', utils.get_project_root(),
+        ]
+        self.vprint(
+            2,
+            'Processing the following command for install:\n'
+            '{}'.format(cmd)
+        )
         subprocess.run(cmd, check=True)
 
     def get_pip(self):
@@ -447,7 +423,7 @@ class Install(object):
             return 'pip'
 
     def print_conf(self):
-        if self.verbosity < 2:
+        if self.verbosity and self.verbosity < 2:
             return
         print('Using the following configuration settings:', flush=True)
         for key, val in sorted(self.settings.items()):
@@ -477,10 +453,6 @@ class Install(object):
         if os.path.basename(sys.argv[0]) == 'snodas':
             self.snodas_command_error()
             return 1
-
-        if options.get('version'):
-            print('snodas version {}'.format(self.get_version()), flush=True)
-            return 2
 
         self.verbosity = options.get('verbosity')
 
@@ -522,7 +494,7 @@ class Install(object):
             )
 
         self.vprint(1, 'Installing project')
-        self.install(options)
+        self.install()
 
         if not options.get('no_configure'):
             self.write_conf_file()
@@ -563,7 +535,7 @@ class Command(BaseCommand):
         don't want to display options that are not supported.
         """
         parser = CommandParser(
-            self, prog="%s %s" % (os.path.basename(prog_name), subcommand),
+            prog="%s %s" % (os.path.basename(prog_name), subcommand),
             description=Install.help or None,
         )
         self.add_arguments(parser)
