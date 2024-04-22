@@ -3,6 +3,7 @@ from django.http import HttpRequest, HttpResponse
 from django.urls import path, reverse
 
 from ninja import NinjaAPI
+from ninja.errors import HttpError
 
 from snodas import types
 from snodas.views import (
@@ -156,6 +157,13 @@ def id_stat_range_query(
         request,
         api,
     )
+
+    if not pourpoint.properties.area_meters:
+        raise HttpError(
+            status_code=409,
+            message='Pourpoint does not have an AOI polygon',
+        )
+
     query = types.DateRangeQuery(
         start_date=start_date,
         end_date=end_date,
@@ -187,6 +195,13 @@ def id_stat_doy_query(
         request,
         api,
     )
+
+    if not pourpoint.properties.area_meters:
+        raise HttpError(
+            status_code=409,
+            message='Pourpoint does not have an AOI polygon',
+        )
+
     query = types.DOYQuery(
         month=month,
         day=day,

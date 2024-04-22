@@ -223,6 +223,7 @@ class PourPoints(BaseModel):
 
 
 class SnodasStats(BaseModel):
+    date: date
     swe: float
     depth: float
     runoff: float
@@ -343,20 +344,19 @@ PourPointQuery = Annotated[
 class PourPointStats(BaseModel):
     pourpoint: PourPoint
     query: PourPointQuery
-    results: dict[str, SnodasStats] = Field(
+    results: list[SnodasStats] = Field(
         ...,
-        examples=[{
-            '2008-12-14': {
-                'swe': 0.018373034138853925,
-                'depth': 0.12781884243276667,
-                'runoff': 0.0000057251843327792756,
-                'sublimation': -0.00012737501598261594,
-                'average_temp': 266.3164421865995,
-                'precip_solid': 6.18786387077508,
-                'precip_liquid': 0.03673017090738538,
-                'sublimation_blowing': -6.307803776158206e-8,
-            },
-        }],
+        examples=[[{
+            'date': '2008-12-14',
+            'swe': 0.018373034138853925,
+            'depth': 0.12781884243276667,
+            'runoff': 0.0000057251843327792756,
+            'sublimation': -0.00012737501598261594,
+            'average_temp': 266.3164421865995,
+            'precip_solid': 6.18786387077508,
+            'precip_liquid': 0.03673017090738538,
+            'sublimation_blowing': -6.307803776158206e-8,
+        }]],
     )
     links: list[Link] = []
 

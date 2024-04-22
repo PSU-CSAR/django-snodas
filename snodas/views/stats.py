@@ -27,21 +27,17 @@ def raw_stat_query_csv(request, cursor, filename, stat_query):
 def get_pourpoint_stats(
     pourpoint_id: int,
     query: types.DateQuery,
-) -> dict[str, types.SnodasStats]:
+) -> list[types.SnodasStats]:
     with connection.cursor() as cursor:
         cursor.execute(
             query.stat_query(pourpoint_id).as_string(cursor.connection),
         )
         columns = (x.name for x in cursor.description)
         rows = cursor.fetchall()
-        rtn: dict[str, types.SnodasStats] = {}
-
-        for row in rows:
-            result = dict(zip(columns, row))
-            date = result.pop('date')
-            rtn[str(date)] = types.SnodasStats(**result)
-
-        return rtn
+        return [
+            types.SnodasStats(**dict(zip(columns, row)))
+            for row in rows
+        ]
 
 
 def get_csv_statistics(
