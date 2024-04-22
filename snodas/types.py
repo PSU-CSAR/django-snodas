@@ -1,9 +1,13 @@
 from datetime import datetime, date
 from enum import auto, StrEnum
-from typing import Annotated, Literal, Protocol
+from typing import Annotated, Literal, Protocol, Self
+
+from django.http import HttpRequest
+from django.urls import reverse
+from ninja import NinjaAPI
 
 from psycopg2 import sql
-from pydantic import BaseModel, Field, PlainValidator, WithJsonSchema
+from pydantic import AnyUrl, BaseModel, Field, PlainValidator, WithJsonSchema, field_serializer
 
 YYYY = r'\d{4}'
 MM = r'(0[1-9]|1[0-2])'
@@ -78,10 +82,24 @@ Zoom = Annotated[
 ]
 
 
+class Link(BaseModel):
+    href: AnyUrl
+    title: str | None = None
+    rel: str | None = None
+    type: str | None = None
+
+    def __init__(self, href: AnyUrl | str, **kwargs) -> None:
+        super().__init__(href=href, **kwargs)
+
+    @field_serializer('href')
+    def serialize_href(self, href: AnyUrl) -> str:
+        return str(href)
+
+
 class PourPointProperties(BaseModel):
     name: str = Field(..., examples=['Clark Fork R at St. Regis'])
     station_triplet: StationTriplet
-    area_meters: float = Field(..., examples=[27740389176.977703])
+    area_meters: float | None = Field(..., examples=[27740389176.977703])
 
 
 class Point(BaseModel):
@@ -97,11 +115,111 @@ class PourPoint(BaseModel):
     id: int = Field(..., gt=0, examples=[1])
     geometry: Point
     properties: PourPointProperties
+    links: list[Link] = []
+
+    def build_links(
+        self: Self,
+        request: HttpRequest,
+        api: NinjaAPI,
+        full: bool = False,
+        from_triplet: bool = False,
+    ) -> Self:
+        self.links = [
+            Link(
+                rel=('canonical' if from_triplet else 'self'),
+                type='application/geo+json',
+                href=request.build_absolute_uri(
+                    reverse(
+                        f'{api.urls_namespace}:get_pourpoint_by_id',
+                        args=(self.id,),
+                    ),
+                ),
+            ),
+        ]
+
+        if from_triplet:
+            self.links.append(
+                Link(
+                    rel='self',
+                    type='application/geo+json',
+                    href=request.build_absolute_uri(
+                        reverse(
+                            f'{api.urls_namespace}:get_pourpoint_by_triplet',
+                            args=(self.properties.station_triplet,),
+                        ),
+                    ),
+                ),
+            )
+
+        if full and self.properties.area_meters:
+            self.links.extend([
+                Link(
+                    rel='related',
+                    type='application/json',
+                    href=request.build_absolute_uri(
+                        reverse(
+                            f'{api.urls_namespace}:id_stat_range_query',
+                            args=(self.id,),
+                        ),
+                    ),
+                    title='Query AOI statistics by date range',
+                ),
+                Link(
+                    rel='related',
+                    type='application/json',
+                    href=request.build_absolute_uri(
+                        reverse(
+                            f'{api.urls_namespace}:id_stat_doy_query',
+                            args=(self.id,),
+                        ),
+                    ),
+                    title='Query AOI statistics by day of year',
+                ),
+            ])
+
+        if full:
+            self.links.extend([
+                Link(
+                    rel='root',
+                    type='application/json',
+                    href=request.build_absolute_uri(
+                        reverse(
+                            f'{api.urls_namespace}:api_root',
+                        ),
+                    ),
+                ),
+            ])
+
+        return self
 
 
 class PourPoints(BaseModel):
     type: Literal['FeatureCollection'] = 'FeatureCollection'
     features: list[PourPoint]
+    links: list[Link] = []
+
+    def build_links(self: Self, request: HttpRequest, api: NinjaAPI) -> Self:
+        self.links = [
+            Link(
+                rel='self',
+                type='application/geo+json',
+                href=request.build_absolute_uri(),
+            ),
+            Link(
+                rel='root',
+                type='application/json',
+                href=request.build_absolute_uri(
+                    reverse(
+                        f'{api.urls_namespace}:api_root',
+                    ),
+                ),
+            ),
+        ]
+
+        for feature in self.features:
+            feature.build_links(request, api)
+
+        return self
 
 
 class SnodasStats(BaseModel):
@@ -240,3 +358,30 @@ class PourPointStats(BaseModel):
             },
         }],
     )
+    links: list[Link] = []
+
+    def build_links(self: Self, request: HttpRequest, api: NinjaAPI) -> Self:
+        self.links = [
+            Link(
+                rel='self',
+                type='application/json',
+                href=request.build_absolute_uri(),
+            ),
+            Link(
+                rel='root',
+                type='application/json',
+                href=request.build_absolute_uri(
+                    reverse(
+                        f'{api.urls_namespace}:api_root',
+                    ),
+                ),
+            ),
+        ]
+        self.pourpoint.build_links(request, api)
+        return self
+
+
+class LandingPage(BaseModel):
+    title: str
+    description: str
+    links: list[Link]

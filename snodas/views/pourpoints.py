@@ -24,7 +24,8 @@ def get_points() -> types.PourPoints:
                 name,
                 awdb_id as station_triplet,
                 point,
-                area_meters
+                area_meters,
+                polygon is not null as has_polygon
             FROM pourpoint.pourpoint
         ) inputs
     '''
