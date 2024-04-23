@@ -13,7 +13,7 @@ YYYY = r'\d{4}'
 MM = r'(0[1-9]|1[0-2])'
 DD = r'(0[1-9]|[1-2][0-9]|3[0-1])'
 DATE = f'{YYYY}-?{MM}-?{DD}'
-STATION_TRIPLET = '[a-zA-Z0-9]+:[a-zA-Z]{2}:[a-zA-Z]+'
+STATION_TRIPLET = r'[a-zA-Z0-9\-]+:[a-zA-Z]{2}:[a-zA-Z]+'
 
 
 class SnodasVariable(StrEnum):
