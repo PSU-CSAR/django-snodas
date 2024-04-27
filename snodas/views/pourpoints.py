@@ -2,16 +2,15 @@ import logging
 from typing import assert_never
 
 from django.db import connection
-from django.http import HttpResponse, Http404
+from django.http import Http404
 
 from snodas import types
-
 
 logger = logging.getLogger(__name__)
 
 
 def get_points() -> types.PourPoints:
-    query = '''
+    query = """
         SELECT jsonb_build_object(
             'type', 'Feature',
             'id', pourpoint_id,
@@ -28,7 +27,7 @@ def get_points() -> types.PourPoints:
                 polygon is not null as has_polygon
             FROM pourpoint.pourpoint
         ) inputs
-    '''
+    """
 
     with connection.cursor() as cursor:
         cursor.execute(query)
@@ -43,7 +42,7 @@ def get_points() -> types.PourPoints:
 def get_point(pourpoint_ref: int | str) -> types.PourPoint:
     match pourpoint_ref:
         case int():
-            query = '''
+            query = """
                 SELECT jsonb_build_object(
                     'type', 'Feature',
                     'id', pourpoint_id,
@@ -60,9 +59,9 @@ def get_point(pourpoint_ref: int | str) -> types.PourPoint:
                     FROM pourpoint.pourpoint
                     WHERE pourpoint_id = %s
                 ) inputs
-            '''
+            """
         case str():
-            query = '''
+            query = """
                 SELECT jsonb_build_object(
                     'type', 'Feature',
                     'id', pourpoint_id,
@@ -79,7 +78,7 @@ def get_point(pourpoint_ref: int | str) -> types.PourPoint:
                     FROM pourpoint.pourpoint
                     WHERE awdb_id = %s
                 ) inputs
-            '''
+            """
         case _ as unreachable:
             assert_never(unreachable)
 

@@ -1,10 +1,10 @@
 import argparse
+import io
 import os
 import random
 import string
-import yaml
-import io
 
+import yaml
 
 CONF_FILE_NAME = 'project.conf'
 SETTINGS_DIR = os.path.join(
@@ -15,6 +15,7 @@ SETTINGS_DIR = os.path.join(
 
 def to_namedtuple(dictionary):
     from collections import namedtuple
+
     return namedtuple('GenericDict', list(dictionary.keys()))(**dictionary)
 
 
@@ -27,26 +28,26 @@ def generate_secret_key(length=50):
     choices = '{}{}{}'.format(
         string.ascii_letters,
         string.digits,
-        string.punctuation.replace('\'', '').replace('\\', ''),
+        string.punctuation.replace("'", '').replace('\\', ''),
     )
     return ''.join(
-        [random.SystemRandom().choice(choices) for i in range(length)]
+        [random.SystemRandom().choice(choices) for i in range(length)],
     )
 
 
 def destruct_path(path):
-    '''take a path and break it's pieces into a list:
+    r"""take a path and break it's pieces into a list:
     d:\projects\snodas\development becomes
-    ['d:', 'projects', 'snodas', 'development']'''
+    ['d:', 'projects', 'snodas', 'development']"""
 
     folders = []
     while True:
         path, folder = os.path.split(path)
 
-        if folder != "":
+        if folder != '':
             folders.append(folder)
         else:
-            if path != "":
+            if path != '':
                 folders.append(path)
 
             break
@@ -74,17 +75,18 @@ def get_settings_file(file_name=None):
 
 def load_conf_file(config=os.path.join(get_project_root(), CONF_FILE_NAME)):
     try:
-        with open(config, 'r') as f:
+        with open(config) as f:
             return yaml.safe_load(f)
-    except (IOError, OSError):
-        raise Exception((
-            'Could not load project configuration file {}. '
-            'Have you installed this snodas instance?'
-        ).format(config))
+    except OSError:
+        raise Exception(
+            f'Could not load project configuration file {config}. '
+            'Have you installed this snodas instance?',
+        )
 
 
 class FullPaths(argparse.Action):
     """Expand user- and relative-paths"""
+
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, os.path.abspath(os.path.expanduser(values)))
 
@@ -92,7 +94,7 @@ class FullPaths(argparse.Action):
 def is_dir(dirname):
     """Checks if a path is an actual directory"""
     if not os.path.isdir(dirname):
-        msg = "{0} is not a directory".format(dirname)
+        msg = f'{dirname} is not a directory'
         raise argparse.ArgumentTypeError(msg)
     else:
         return dirname
@@ -101,7 +103,7 @@ def is_dir(dirname):
 def is_file(name):
     """Checks if a path is an actual file"""
     if not os.path.isfile(name):
-        msg = "{0} is not a file".format(name)
+        msg = f'{name} is not a file'
         raise argparse.ArgumentTypeError(msg)
     else:
         return name
@@ -164,7 +166,7 @@ def chain_streams(streams, buffer_size=io.DEFAULT_BUFFER_SIZE, sep=b''):
                     self.stream = None
                     return 0  # indicate EOF
             output, self.leftover = chunk[:buffer_length], chunk[buffer_length:]
-            b[:len(output)] = output
+            b[: len(output)] = output
             return len(output)
 
     return io.BufferedReader(ChainStream(), buffer_size=buffer_size)

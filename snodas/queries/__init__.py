@@ -1,4 +1,4 @@
-'''
+"""
 Basic idea here is any *.sql files in this dir will
 be loaded as python modules where all queries in those
 files will be python functions. The return type will be a
@@ -36,17 +36,22 @@ for string interpolation), and can contain:
       Note that a id and parameter of the same name will be filled
       with a single function arg of that name. But places where
       there is overlap, the identifier must end with '_i'.
-'''
+"""
+
 import os as _os
 import re as _re
-from types import ModuleType as _MT
 from glob import glob as _glob
+from types import ModuleType as _MT
+
 from psycopg2.sql import (
     SQL as _SQL,
-    Literal as _Literal,
+)
+from psycopg2.sql import (
     Identifier as _Identifier,
 )
-
+from psycopg2.sql import (
+    Literal as _Literal,
+)
 
 # TODO: I think this might be refined if I used a custom
 #       loader rather than the hacks below. Not sure.
@@ -62,7 +67,7 @@ class _QueriesFactory:
         r'((?:---.*\n?)+)((?:(?!=^---).*?\n)+?)(?:(?:--- endquery.*$))',
         flags=_re.M,
     )
-    _topdoc_re = _re.compile(r'(?:\A--=)(.*?)(?:^--=)', flags=_re.M|_re.S)
+    _topdoc_re = _re.compile(r'(?:\A--=)(.*?)(?:^--=)', flags=_re.M | _re.S)
     _meta_replace_re = _re.compile(r'^---\s*')
     _name_re = _re.compile(r'(?:name:\s+)([\w\s]+)')
     _param_re = _re.compile(r'(?:param:\s+)(\w+)')
@@ -77,14 +82,14 @@ class _QueriesFactory:
     @staticmethod
     def _add(self, name, ids, params, raws, docstr, sql):
         if name in self.__dict__:
-            raise ParseError("Duplicate query name: '{}'".format(name))
+            raise ParseError(f"Duplicate query name: '{name}'")
 
         args = ', '.join(params.union(ids).union(raws))
-        idstring = ', '.join(['{i}_i=Ident({i})'.format(i=i) for i in ids.intersection(params)])
-        idstring += ', '.join(['{i}=Ident({i})'.format(i=i) for i in ids.difference(params)])
-        rawstring = ', '.join(['{r}=Raw(str({r}))'.format(r=r) for r in raws])
-        paramstring = ', '.join(['{p}=Lit({p})'.format(p=p) for p in params])
-        func = "def {name}({args}):\n    return sql.format({kwargs})\n".format(
+        idstring = ', '.join([f'{i}_i=Ident({i})' for i in ids.intersection(params)])
+        idstring += ', '.join([f'{i}=Ident({i})' for i in ids.difference(params)])
+        rawstring = ', '.join([f'{r}=Raw(str({r}))' for r in raws])
+        paramstring = ', '.join([f'{p}=Lit({p})' for p in params])
+        func = 'def {name}({args}):\n    return sql.format({kwargs})\n'.format(
             name=name,
             args=args,
             kwargs=', '.join(filter(bool, [idstring, paramstring, rawstring])),
@@ -135,7 +140,9 @@ class _QueriesFactory:
             if is_param:
                 param = is_param.group(1)
                 if param in params:
-                    raise ParseError("Query parameter specified more than once: '{}'".format(param))
+                    raise ParseError(
+                        f"Query parameter specified more than once: '{param}'"
+                    )
                 params.add(param)
                 continue
 
@@ -143,7 +150,9 @@ class _QueriesFactory:
             if is_id:
                 _id = is_id.group(1)
                 if _id in ids:
-                    raise ParseError("Query identifier specified more than once: '{}'".format(_id))
+                    raise ParseError(
+                        f"Query identifier specified more than once: '{_id}'"
+                    )
                 ids.add(_id)
                 continue
 
@@ -151,7 +160,9 @@ class _QueriesFactory:
             if is_raw:
                 raw = is_raw.group(1)
                 if raw in raws:
-                    raise ParseError("Query identifier specified more than once: '{}'".format(_id))
+                    raise ParseError(
+                        f"Query identifier specified more than once: '{_id}'"
+                    )
                 raws.add(raw)
                 continue
 
@@ -161,7 +172,7 @@ class _QueriesFactory:
 
         if len(names) > 1:
             raise ParseError(
-                "Query cannot have more than one name. Found '{}'".format(names),
+                f"Query cannot have more than one name. Found '{names}'",
             )
         elif len(names) < 1:
             raise ParseError(
@@ -182,6 +193,10 @@ class _QueriesFactory:
 
 
 locals().update(
-    {_os.path.splitext(_os.path.basename(f))[0]: _QueriesFactory.load(f)
-     for f in _glob(_os.path.join(_os.path.dirname(__file__), '*.sql'),
-                    recursive=False)})
+    {
+        _os.path.splitext(_os.path.basename(f))[0]: _QueriesFactory.load(f)
+        for f in _glob(
+            _os.path.join(_os.path.dirname(__file__), '*.sql'), recursive=False
+        )
+    }
+)

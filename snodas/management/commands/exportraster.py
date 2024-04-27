@@ -1,20 +1,16 @@
+import datetime
 import os
 import pathlib
-import datetime
+from argparse import Namespace
 
 import netCDF4 as nc
-
-from argparse import Namespace
-from psycopg2 import sql
-
-from django.db import connection
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
-from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.db.backends.postgis.pgraster import from_pgraster
-
+from django.contrib.gis.gdal import GDALRaster
+from django.core.management.base import BaseCommand, CommandError
+from django.db import connection
 from django_snodas.constants import snodas_variables
-
+from psycopg2 import sql
 
 # TODO: use an "atomic replace" to the dest path from an intermediate temp file
 # to handle a situation where this is killed before writing the file can finish
@@ -44,14 +40,14 @@ CALENDAR = 'standard'
 DATE_RANGE_NAME = 'date-range'
 DOY_NAME = 'doy'
 
-PP_QUERY = '''SELECT
+PP_QUERY = """SELECT
   name
 FROM
   pourpoint.pourpoint
 WHERE
-  pourpoint_id = %s'''
+  pourpoint_id = %s"""
 
-RASTER_QUERY_DOY = '''SELECT
+RASTER_QUERY_DOY = """SELECT
   t
 FROM
   snodas.raster as r,
@@ -68,9 +64,9 @@ WHERE
     AND date_part('day', r.date) = {day}
     AND p.pourpoint_id = {id}
 ORDER BY
-  date'''
+  date"""
 
-RASTER_QUERY_DATE_RANGE = '''SELECT
+RASTER_QUERY_DATE_RANGE = """SELECT
   t
 FROM
   snodas.raster as r,
@@ -85,7 +81,7 @@ WHERE
   {daterange}::daterange @> r.date
     AND p.pourpoint_id = {id}
 ORDER BY
-  date'''
+  date"""
 
 
 def datetype(date):
@@ -124,7 +120,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '-m',
             '--variable',
-            #nargs='+',
+            # nargs='+',
             choices=self.cols,
             required=True,
             help='What variable do export.',
@@ -188,7 +184,7 @@ class Command(BaseCommand):
     @staticmethod
     def make_path_doy(options, pourpoint_name):
         name = '{}_{}_{}{}-{}{}.nc'.format(
-            "-".join(pourpoint_name.split()),
+            '-'.join(pourpoint_name.split()),
             options.variable,
             options.start_year,
             options.doy,
@@ -199,7 +195,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def build_query_date_range(options):
-        daterange = '[{}, {}]'.format(options.start_date, options.end_date)
+        daterange = f'[{options.start_date}, {options.end_date}]'
         return sql.SQL(RASTER_QUERY_DATE_RANGE).format(
             id=sql.Literal(options.pourpoint_id),
             var=sql.SQL(options.variable),
@@ -209,10 +205,10 @@ class Command(BaseCommand):
     @staticmethod
     def make_path_date_range(options, pourpoint_name):
         name = '{}_{}_{}-{}.nc'.format(
-            "-".join(pourpoint_name.split()),
+            '-'.join(pourpoint_name.split()),
             options.variable,
-            options.start_date.strftime("%Y%m%d"),
-            options.end_date.strftime("%Y%m%d"),
+            options.start_date.strftime('%Y%m%d'),
+            options.end_date.strftime('%Y%m%d'),
         )
         return os.path.join(settings.MEDIA_ROOT, 'snodas', 'daterange', name)
 
@@ -223,7 +219,7 @@ class Command(BaseCommand):
             raster_query = self.build_query_doy(options)
             make_path = self.make_path_doy
             # TODO: finish this up for DOY queries
-            #self.start_date = datetime.date(year=options.start_year, )
+            # self.start_date = datetime.date(year=options.start_year, )
             self.interval = 'year'
         elif options.query_type == DATE_RANGE_NAME:
             raster_query = self.build_query_date_range(options)
@@ -232,7 +228,7 @@ class Command(BaseCommand):
             self.interval = 'day'
         else:
             raise CommandError(
-                'Unrecognized query type: {}'.format(options.subparser_name),
+                f'Unrecognized query type: {options.subparser_name}',
             )
 
         with connection.cursor() as cursor:
@@ -240,9 +236,7 @@ class Command(BaseCommand):
             pp = cursor.fetchone()
 
             if not pp:
-                raise CommandError('Pourpoint ID not found: {}'.format(
-                    options.pourpoint_id,
-                ))
+                raise CommandError(f'Pourpoint ID not found: {options.pourpoint_id}')
 
             self.path = make_path(options, pp[0])
 
@@ -264,11 +258,12 @@ class Command(BaseCommand):
 
         # create the directory tree if any components missing
         pathlib.Path(os.path.dirname(self.path)).mkdir(
-            parents=True, exist_ok=True,
+            parents=True,
+            exist_ok=True,
         )
 
         # TODO: print with high verbosity level
-        #for key in raster_def.keys():
+        # for key in raster_def.keys():
         #    if key != 'bands':
         #        print(key, raster_def[key])
 
@@ -283,7 +278,7 @@ class Command(BaseCommand):
             zlib=True,
             complevel=9,
             least_significant_digit=1,
-            fill_value=raster.bands[0].nodata_value
+            fill_value=raster.bands[0].nodata_value,
         )
         var.standard_name = options.variable
         var.units = 'acre_feet'
@@ -295,8 +290,7 @@ class Command(BaseCommand):
         return self.path
 
     def create_base_dataset(self, raster):
-        rows, coords_y, cols, coords_x = \
-            self.extract_cells_from_raster_def(raster)
+        rows, coords_y, cols, coords_x = self.extract_cells_from_raster_def(raster)
 
         dsout = nc.Dataset(self.path, 'w', clobber=True, format=NETCDF_FORMAT)
 
@@ -304,14 +298,14 @@ class Command(BaseCommand):
         lat = dsout.createVariable('lat', 'f4', ('lat',))
         lat.standard_name = 'latitude'
         lat.units = 'degrees_north'
-        lat.axis = "Y"
+        lat.axis = 'Y'
         lat[:] = coords_y
 
         dsout.createDimension('lon', cols)
         lon = dsout.createVariable('lon', 'f4', ('lon',))
         lon.standard_name = 'longitude'
         lon.units = 'degrees_east'
-        lon.axis = "X"
+        lon.axis = 'X'
         lon[:] = coords_x
 
         dsout.createDimension(self.interval, 0)
@@ -334,11 +328,10 @@ class Command(BaseCommand):
     def extract_cells_from_raster_def(raster, center_coords=True):
         rows = raster.height
         cols = raster.width
-        origin_x, scale_x, skew_x, origin_y, skew_y, scale_y = \
-            raster.geotransform
+        origin_x, scale_x, skew_x, origin_y, skew_y, scale_y = raster.geotransform
 
         if skew_x != 0 or skew_y != 0:
-            print('Found rotation: skew_x={}, skew_y={}'.format(skew_x, skew_y))
+            print(f'Found rotation: skew_x={skew_x}, skew_y={skew_y}')
             raise CommandError('Rotated grids are not currently supported')
 
         center_offset_x = (scale_x * 0.5) if center_coords else 0

@@ -1,9 +1,8 @@
 import os
 
-from split_settings.tools import optional, include
+from split_settings.tools import include, optional
 
 from ..management.utils import load_conf_file
-
 
 conf_settings = load_conf_file()
 
@@ -37,14 +36,14 @@ DEBUG = conf_settings.get('DEBUG', False)
 # first pull in the base settings
 settings_files = [
     'base.py',
-#    'caching.py',
+    #    'caching.py',
     'database.py',
     'logging.py',
     'cors.py',
 ]
 
 # add the env-specific settings and any additional settings
-#settings_files.append(optional(DEPLOYMENT_TYPE+'.py'))
+# settings_files.append(optional(DEPLOYMENT_TYPE+'.py'))
 settings_files.extend(conf_settings.get('ADDITIONAL_SETTING_FILES', []))
 
 # always use the local settings file if present

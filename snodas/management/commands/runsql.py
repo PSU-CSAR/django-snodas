@@ -1,21 +1,18 @@
 # based in part on the loaddata command from django
 # some of the code falls under that django copyright
+import gzip
 import os
 import sys
-import gzip
-
 from pprint import pprint
 from zipfile import ZipFile
 
 import sqlparse
-
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from django.db import connections, DEFAULT_DB_ALIAS, transaction
-
+from django.db import DEFAULT_DB_ALIAS, connections, transaction
 
 try:
     import bz2
+
     has_bz2 = True
 except ImportError:
     has_bz2 = False
@@ -28,7 +25,7 @@ class SingleZipReader(ZipFile):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if len(self.namelist()) != 1:
-            raise ValueError("Zip-compressed sql must contain only one file.")
+            raise ValueError('Zip-compressed sql must contain only one file.')
 
     def read(self):
         return super().read(self, self.namelist()[0])
@@ -83,21 +80,21 @@ class Command(BaseCommand):
         sf_readers = {sf: self.get_reader(sf) for sf in sqlfiles}
 
         for sqlfile, reader in sf_readers.items():
-            self.vprint(2, 'Processing file {}...'.format(sqlfile))
+            self.vprint(2, f'Processing file {sqlfile}...')
 
             self.vprint(2, '...opening file...')
             opener, mode = reader
-            self.vprint(3, '...using reader {}...'.format(opener))
+            self.vprint(3, f'...using reader {opener}...')
             with opener(sqlfile, mode) as s:
                 sql = s.read()
             self.vprint(2, 'File opened.')
-
 
             self.vprint(2, 'Running sql...')
             if options['use_transaction']:
                 with transaction.atomic(using=db):
                     self.vprint(
-                        2, '...opened transaction...',
+                        2,
+                        '...opened transaction...',
                     )
                     self.runsql(sql)
 
@@ -140,12 +137,12 @@ class Command(BaseCommand):
 
         if not os.path.isfile(sqlfile):
             raise CommandError(
-                'sql file {} could not be found'.format(sqlfile),
+                f'sql file {sqlfile} could not be found',
             )
 
         try:
             return self.readers[os.path.splitext(sqlfile)[1]]
         except KeyError:
             raise CommandError(
-                'sql file {} is not a known format.'.format(sqlfile),
+                f'sql file {sqlfile} is not a known format.',
             )

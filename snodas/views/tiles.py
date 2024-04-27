@@ -7,7 +7,6 @@ from django.http import HttpResponse
 
 from snodas import types
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +24,7 @@ EMPTY_PNG = (
 
 def list_dates(request):
     if request.method != 'GET':
-        return HttpResponse(reason="Not allowed", status=405)
+        return HttpResponse(reason='Not allowed', status=405)
 
     with connection.cursor() as cursor:
         cursor.execute('SELECT date FROM snodas.raster ORDER BY date DESC')
@@ -37,9 +36,9 @@ def list_dates(request):
 # TODO: clean this up because it did not help anything
 def date_params(request):
     if request.method != 'GET':
-        return HttpResponse(reason="Not allowed", status=405)
+        return HttpResponse(reason='Not allowed', status=405)
 
-    query = '''WITH start_end as (
+    query = """WITH start_end as (
   SELECT
     MIN(date) as start_date,
     MAX(date) as end_date
@@ -60,7 +59,7 @@ FROM (
     ) AS missing
   WHERE
     missing NOT IN (SELECT date FROM snodas.raster)
-) as t'''
+) as t"""
 
     with connection.cursor() as cursor:
         cursor.execute(query)
@@ -78,7 +77,7 @@ def get_tile(
     format: Literal['png', 'jpg', 'jpeg'],
 ):
     if request.method != 'GET':
-        return HttpResponse(reason="Not allowed", status=405)
+        return HttpResponse(reason='Not allowed', status=405)
 
     # TODO: actually handle jpeg format tiles
     if format == 'jpg':
@@ -89,8 +88,7 @@ def get_tile(
     options = "ARRAY['']"
 
     # TODO: option for resample true/false (currently always false)
-    query = \
-        'SELECT snodas.tile2png((%s, %s, %s)::tms_tilecoordz, %s::date, true)'
+    query = 'SELECT snodas.tile2png((%s, %s, %s)::tms_tilecoordz, %s::date, true)'
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -106,5 +104,5 @@ def get_tile(
 
     return HttpResponse(
         bytes(png),
-        content_type='application/{}'.format(format.lower),
+        content_type=f'application/{format.lower}',
     )

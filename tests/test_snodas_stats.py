@@ -1,9 +1,8 @@
-from datetime import datetime, date
+from datetime import date, datetime
 from functools import partial
 
-from django.test import TestCase
 from django.db import connection
-
+from django.test import TestCase
 
 POLY_PIXEL_X = 100
 POLY_PIXEL_Y = 100
@@ -17,7 +16,7 @@ GEOTRANSFORM = {
     'srid': 4326,
 }
 
-constant_raster_sql = '''SELECT ST_AddBand(ST_MakeEmptyRaster(
+constant_raster_sql = """SELECT ST_AddBand(ST_MakeEmptyRaster(
   6935,
   3351,
   {origin_x},
@@ -27,9 +26,9 @@ constant_raster_sql = '''SELECT ST_AddBand(ST_MakeEmptyRaster(
   {skew_x},
   {skew_y},
   {srid}
-), '16BSI'::text, 1000, -9999)'''.format(**GEOTRANSFORM)
+), '16BSI'::text, 1000, -9999)""".format(**GEOTRANSFORM)
 
-stripe_function_sql = '''CREATE OR REPLACE FUNCTION stripe_callback(
+stripe_function_sql = """CREATE OR REPLACE FUNCTION stripe_callback(
   _value double precision[][][],
   _position integer[][],
   VARIADIC _userargs text[]
@@ -64,9 +63,9 @@ BEGIN
       -9999
     END;
 END;
-$$;'''
+$$;"""
 
-striped_raster_sql = '''SELECT
+striped_raster_sql = """SELECT
 ST_MapAlgebra(
   ST_AddBand(
     ST_MakeEmptyRaster(
@@ -93,9 +92,9 @@ ST_MapAlgebra(
   0,
   'ODD',
   'X'
-)'''.format(**GEOTRANSFORM)
+)""".format(**GEOTRANSFORM)
 
-snodas_sql = '''INSERT INTO snodas.raster (
+snodas_sql = """INSERT INTO snodas.raster (
     swe,
     depth,
     runoff,
@@ -115,10 +114,10 @@ snodas_sql = '''INSERT INTO snodas.raster (
     %s,
     %s,
     %s
-)'''
+)"""
 
 
-pourpoint_sql = '''INSERT INTO pourpoint.pourpoint (
+pourpoint_sql = """INSERT INTO pourpoint.pourpoint (
   name,
   awdb_id,
   source,
@@ -130,16 +129,16 @@ pourpoint_sql = '''INSERT INTO pourpoint.pourpoint (
   'ref',
   ST_GeomFromText('POINT({o_x} {o_y})', {srid}),
   ST_GeomFromText('MULTIPOLYGON((({o_x} {o_y}, {M_x} {o_y}, {M_x} {m_y}, {o_x} {m_y}, {o_x} {o_y})))', {srid})
-)'''.format(
+)""".format(
     o_x=GEOTRANSFORM['origin_x'],
     o_y=GEOTRANSFORM['origin_y'],
     srid=GEOTRANSFORM['srid'],
-    M_x=GEOTRANSFORM['origin_x']+GEOTRANSFORM['scale_x']*POLY_PIXEL_X,
-    m_y=GEOTRANSFORM['origin_y']+GEOTRANSFORM['scale_y']*POLY_PIXEL_Y,
+    M_x=GEOTRANSFORM['origin_x'] + GEOTRANSFORM['scale_x'] * POLY_PIXEL_X,
+    m_y=GEOTRANSFORM['origin_y'] + GEOTRANSFORM['scale_y'] * POLY_PIXEL_Y,
 )
 
 
-stats_sql = '''SELECT
+stats_sql = """SELECT
     date,
     snowcover,
     depth,
@@ -151,7 +150,7 @@ stats_sql = '''SELECT
     precip_liquid,
     average_temp
   FROM pourpoint.statistics
-'''
+"""
 
 
 class ConstantSNODASTestCase(TestCase):
@@ -165,9 +164,9 @@ class ConstantSNODASTestCase(TestCase):
             raster_data = cursor.fetchone()[0]
             cursor.execute(
                 snodas_sql,
-                [raster_data]*8 + [datetime.strptime('20180502', '%Y%m%d')],
+                [raster_data] * 8 + [datetime.strptime('20180502', '%Y%m%d')],
             )
-            print('Raster added in {}.'.format(datetime.now()-s1))
+            print(f'Raster added in {datetime.now()-s1}.')
 
             # add a constant raster
             s1 = datetime.now()
@@ -176,15 +175,15 @@ class ConstantSNODASTestCase(TestCase):
             raster_data = cursor.fetchone()[0]
             cursor.execute(
                 snodas_sql,
-                [raster_data]*8 + [datetime.strptime('20180501', '%Y%m%d')],
+                [raster_data] * 8 + [datetime.strptime('20180501', '%Y%m%d')],
             )
-            print('Raster added in {}.'.format(datetime.now()-s1))
+            print(f'Raster added in {datetime.now()-s1}.')
 
             # add a pourpoint geom
             s1 = datetime.now()
             print('Adding a pourpoint geom...')
             cursor.execute(pourpoint_sql)
-            print('Pourpoint added in {}.'.format(datetime.now()-s1))
+            print(f'Pourpoint added in {datetime.now()-s1}.')
 
     def test_check_stats(self):
         expected = {

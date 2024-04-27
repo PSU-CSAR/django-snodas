@@ -5,23 +5,23 @@ from django.db import connection
 from django.http import HttpResponse
 
 from snodas import types
-from snodas.utils.http import stream_file
 from snodas.queries import streamflow
+from snodas.utils.http import stream_file
 
 
 def raw_stat_query_csv(request, cursor, filename, stat_query):
     flike = BytesIO()
-    csvquery = 'COPY ({}) TO STDOUT WITH CSV HEADER'.format(
-        stat_query.as_string(cursor.connection),
+    csvquery = (
+        f'COPY ({stat_query.as_string(cursor.connection)}) TO STDOUT WITH CSV HEADER'
     )
     cursor.copy_expert(csvquery, flike)
 
     return stream_file(
-            flike,
-            filename,
-            request,
-            'text/csv',
-        )
+        flike,
+        filename,
+        request,
+        'text/csv',
+    )
 
 
 def get_pourpoint_stats(
@@ -35,8 +35,7 @@ def get_pourpoint_stats(
         columns = (x.name for x in cursor.description)
         rows = cursor.fetchall()
         return [
-            types.SnodasStats(**dict(zip(columns, row)))
-            for row in rows
+            types.SnodasStats(**dict(zip(columns, row, strict=False))) for row in rows
         ]
 
 
@@ -46,11 +45,11 @@ def get_csv_statistics(
     query: types.DateQuery,
 ):
     if request.method != 'GET':
-        return HttpResponse(reason="Not allowed", status=405)
+        return HttpResponse(reason='Not allowed', status=405)
 
     match pourpoint_ref:
         case int():
-            pp_query = '''
+            pp_query = """
                 SELECT
                     pourpoint_id,
                     name
@@ -58,9 +57,9 @@ def get_csv_statistics(
                     pourpoint.pourpoint
                 WHERE
                     pourpoint_id = %s
-            '''
+            """
         case str():
-            pp_query = '''
+            pp_query = """
                 SELECT
                     pourpoint_id,
                     name
@@ -68,7 +67,7 @@ def get_csv_statistics(
                     pourpoint.pourpoint
                 WHERE
                     awdb_id = %s
-            '''
+            """
         case _ as unreachable:
             assert_never(unreachable)
 
@@ -98,7 +97,7 @@ def streamflow_regression(
     end_year,
 ):
     if request.method != 'GET':
-        return HttpResponse(reason="Not allowed", status=405)
+        return HttpResponse(reason='Not allowed', status=405)
 
     forecast_start = int(forecast_start)
     forecast_end = int(forecast_end)
@@ -108,12 +107,16 @@ def streamflow_regression(
     end_year = int(end_year)
 
     streamflow_columns = ', '.join(
-        ['streamflow_{} double precision'.format(year)
-         for year in range(start_year, end_year+1)]
+        [
+            f'streamflow_{year} double precision'
+            for year in range(start_year, end_year + 1)
+        ],
     )
     value_columns = ', '.join(
-        ['{}_{} double precision'.format(variable, year)
-         for year in range(start_year, end_year+1)]
+        [
+            f'{variable}_{year} double precision'
+            for year in range(start_year, end_year + 1)
+        ],
     )
     query = streamflow.regression(
         variable=variable,
@@ -127,15 +130,7 @@ def streamflow_regression(
         value_columns=value_columns,
     )
 
-    name = 'streamflow_{}_{}-{}_{}-{}_{}-{}.csv'.format(
-            variable,
-            forecast_start,
-            forecast_end,
-            month,
-            day,
-            start_year,
-            end_year,
-        )
+    name = f'streamflow_{variable}_{forecast_start}-{forecast_end}_{month}-{day}_{start_year}-{end_year}.csv'
 
     with connection.cursor() as cursor:
         return raw_stat_query_csv(request, cursor, name, query)

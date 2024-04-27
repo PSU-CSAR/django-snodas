@@ -4,9 +4,7 @@ from django.core.management.base import BaseCommand
 from django.db import connection
 
 from ...exceptions import GeoJSONValidationError
-
 from ..utils import FullPaths, is_file
-
 
 TABLE = 'pourpoint.pourpoint'
 
@@ -73,7 +71,9 @@ class Pourpoint:
                 )
 
             kwargs['awdb_id'] = geojson['id']
-            kwargs['name'] = geojson['properties'].get('nwccname', geojson['properties']['name'])
+            kwargs['name'] = geojson['properties'].get(
+                'nwccname', geojson['properties']['name']
+            )
             kwargs['source'] = geojson['properties']['source']
         except KeyError as e:
             raise GeoJSONValidationError(
@@ -103,14 +103,12 @@ class Pourpoint:
 
 
 class Command(BaseCommand):
-    help = (
- """
+    help = """
  Load a BAGIS geojson-format pourpoint into the database.
  Simply provide the path to a pourpoint geojson file.
 
  Also allows updating an existing pourpoint with the update option.
  """
-    )
 
     def add_arguments(self, parser):
         super(Command, self).add_arguments(parser)
@@ -160,7 +158,7 @@ class Command(BaseCommand):
                 geojson = json.load(f)
         except json.decoder.JSONDecodeError as e:
             raise GeoJSONValidationError(
-                'Failed to parse pourpoint json'
+                'Failed to parse pourpoint json',
             ) from e
 
         return Pourpoint.from_geojson(geojson)

@@ -27,14 +27,51 @@ dynamic = [
 version = '0.0.1'
 
 [project.scripts]
-snodas = "manage:main"
+snodas = 'manage:main'
 
 [project.urls]
 Repository = 'https://github.com/PSU-CSAR/django-snodas'
 
 [tool.setuptools]
-packages = ["snodas"]
-py-modules = ["manage"]
+packages = ['snodas']
+py-modules = ['manage']
 
 [tool.setuptools.dynamic]
 readme = {file = 'README.md'}
+
+[tool.ruff.format]
+quote-style = 'single'
+
+[tool.ruff.lint]
+# https://docs.astral.sh/ruff/rules/
+select = [
+    'B',
+    'BLE',
+    'C4',
+    'C90',
+    'COM',
+    'DTZ',
+    'E',
+    'ERA',
+    'F',
+    'FA',
+    'G',
+    'I',
+    'INP',
+    'N',
+    'NPY',
+    'PT',
+    'PTH',
+    'RET',
+    'RUF',
+    'S',
+    'SIM',
+    'T20',
+    'UP',
+    'W',
+
+]
+
+[tool.ruff.lint.per-file-ignores]
+'__init__.py' = ['E402']
+'tests/**/*' = ['T201']

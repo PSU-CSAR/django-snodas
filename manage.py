@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-import os
-import sys
 import logging
 import logging.handlers
-
+import os
+import sys
 
 logger = logging.getLogger(__name__)
 LOG_SIZE = 50 * (10**6)  # about 50 MB
@@ -28,7 +27,7 @@ def install(help=False):
             this_dir,
             'snodas',
             'management',
-        )
+        ),
     )
     # then we add the commands package to the path
     # so we have access to the install module
@@ -38,16 +37,17 @@ def install(help=False):
             'snodas',
             'management',
             'commands',
-        )
+        ),
     )
     # and lastly we add the directory of this file
     # to the path so we can import from setup.py
     sys.path.append(
         os.path.join(
             this_dir,
-        )
+        ),
     )
     from install import Install
+
     if help:
         Install.print_help(sys.argv[0], sys.argv[2])
     else:
@@ -55,7 +55,7 @@ def install(help=False):
 
 
 def default_django_command():
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "snodas.settings")
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'snodas.settings')
 
     # check to make sure we can import the settings
     # otherwise, we suspect the env has not been activated
@@ -68,8 +68,8 @@ def default_django_command():
         import snodas.settings as _
     except ImportError:
         logger.debug(
-            'snodas.settings couldn\'t be imported; '
-            'looks like the correct env is not activated'
+            "snodas.settings couldn't be imported; "
+            'looks like the correct env is not activated',
         )
         print(ACTIVATE_HELP)
         return 1
@@ -82,20 +82,20 @@ def default_django_command():
     # which fails either because snodas cannot be found, or
     # sondas is found, and it is the snodas package in the
     # current directory.)
-    if len(sys.argv) > 1 and \
-            sys.argv[1] == 'runserver' and \
-            not ('--help' in sys.argv or '-h' in sys.argv):
+    if (
+        len(sys.argv) > 1
+        and sys.argv[1] == 'runserver'
+        and not ('--help' in sys.argv or '-h' in sys.argv)
+    ):
         logger.debug(
-            'rewritting sys.argv[0] from {} to {}'.format(
-                sys.argv[0],
-                __file__,
-            )
+            f'rewritting sys.argv[0] from {sys.argv[0]} to {__file__}',
         )
         sys.argv[0] = __file__
 
     from django.core.management import execute_from_command_line
+
     logger.debug(
-        'executing from the command line with sys.argv: {}'.format(sys.argv)
+        f'executing from the command line with sys.argv: {sys.argv}',
     )
     return execute_from_command_line(sys.argv)
 
@@ -107,32 +107,36 @@ def main():
         backupCount=(LOG_COUNT - 1),
     )
     formatter = logging.Formatter(
-        '%(asctime)s %(name)s [%(levelname)-5s] %(message)s'
+        '%(asctime)s %(name)s [%(levelname)-5s] %(message)s',
     )
     manage_log.setFormatter(formatter)
     logger.setLevel(logging.DEBUG)
     logger.addHandler(manage_log)
-    #logging.basicConfig(
+    # logging.basicConfig(
     #    filename=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'manage_%s_%d.log' %(datetime.datetime.now().strftime('%y%m%d_%H%M%S'), os.getpid())),
     #    filemode='w',
     #    format='%(asctime)s [%(levelname)-5s] %(message)s',
     #    level=logging.DEBUG,
-    #)
+    # )
 
     if len(sys.argv) > 1 and sys.argv[1] == 'install':
         logger.debug('install command run')
         return install()
-    if len(sys.argv) > 1 and \
-            os.path.basename(sys.argv[0]) == 'manage.py' and \
-            sys.argv[1] == 'help' and \
-            sys.argv[2] == 'install':
+    if (
+        len(sys.argv) > 1
+        and os.path.basename(sys.argv[0]) == 'manage.py'
+        and sys.argv[1] == 'help'
+        and sys.argv[2] == 'install'
+    ):
         logger.debug('install help run')
         return install(help=True)
     elif not os.path.isfile(CONF_FILE):
-        logger.error('config file could not be loaded: {}'.format(CONF_FILE))
-        print('ERROR: Could not find configuration file {}.'.format(CONF_FILE))
-        print('Has this instance been installed? '
-              'Try running `python manage.py install`.')
+        logger.error(f'config file could not be loaded: {CONF_FILE}')
+        print(f'ERROR: Could not find configuration file {CONF_FILE}.')
+        print(
+            'Has this instance been installed? '
+            'Try running `python manage.py install`.'
+        )
     else:
         try:
             return default_django_command()
@@ -141,5 +145,5 @@ def main():
             raise
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())
