@@ -1,16 +1,13 @@
 import os
 import sys
-
 from getpass import getpass
-
-from psycopg2 import connect, ProgrammingError
 
 from django.conf import settings
 from django.core import management
 from django.core.management.base import BaseCommand, CommandError
+from psycopg2 import ProgrammingError, connect
 
 from ..utils import get_default
-
 from . import dropdb
 
 
@@ -28,13 +25,13 @@ class Command(BaseCommand):
             '--admin-user',
             default='postgres',
             help='The admin postgres user to use to create the DB. '
-                 'Default is postgres.',
+            'Default is postgres.',
         )
         parser.add_argument(
             '-P',
             '--admin-pass',
             help='The admin postgres user to use to create the DB. '
-                 'Default is to prompt user for input.',
+            'Default is to prompt user for input.',
         )
         parser.add_argument(
             '-R',
@@ -42,7 +39,7 @@ class Command(BaseCommand):
             action='store',
             default='default',
             help='Use this router-database other than '
-                 'the default defined in settings.py',
+            'the default defined in settings.py',
         )
         parser.add_argument(
             '-D',
@@ -55,21 +52,21 @@ class Command(BaseCommand):
             '-o',
             '--owner',
             default='app',
-            help='The database owner username.'
+            help='The database owner username.',
         )
 
     def handle(self, *args, **options):
         router = options.get('router')
         dbinfo = settings.DATABASES.get(router)
         if dbinfo is None:
-            raise CommandError("Unknown database router %s" % router)
+            raise CommandError('Unknown database router %s' % router)
 
         owner = options.get('owner')
         createuser = options.get('admin_user')
         createpass = get_default(
             options,
             'admin_pass',
-            getpass('Please enter the {} user password: '.format(createuser)),
+            getpass(f'Please enter the {createuser} user password: '),
         )
 
         dbuser = dbinfo.get('USER')
@@ -98,7 +95,7 @@ class Command(BaseCommand):
             with connection.cursor() as cursor:
                 # create the owner role for consistent object ownership
                 try:
-                    cursor.execute("CREATE ROLE {}".format(owner))
+                    cursor.execute(f'CREATE ROLE {owner}')
                 except ProgrammingError:
                     # app user already exists
                     pass
@@ -106,11 +103,7 @@ class Command(BaseCommand):
                 # create the login user
                 try:
                     cursor.execute(
-                        "CREATE ROLE {} WITH LOGIN ENCRYPTED PASSWORD '{}' IN ROLE {}".format(
-                            dbuser,
-                            dbpass,
-                            owner,
-                        ),
+                        f"CREATE ROLE {dbuser} WITH LOGIN ENCRYPTED PASSWORD '{dbpass}' IN ROLE {owner}",
                     )
                 except ProgrammingError:
                     # login user already exsits
@@ -118,10 +111,7 @@ class Command(BaseCommand):
 
                 # create the database
                 cursor.execute(
-                    'CREATE DATABASE {} WITH ENCODING \'UTF-8\' OWNER {}'.format(
-                        dbname,
-                        owner,
-                    ),
+                    f"CREATE DATABASE {dbname} WITH ENCODING 'UTF-8' OWNER {owner}",
                 )
         finally:
             try:
@@ -152,8 +142,8 @@ class Command(BaseCommand):
             except (NameError, AttributeError):
                 pass
 
-        print((
-            '\nDatabase {} created. '
+        print(
+            f'\nDatabase {settings.PROJECT_NAME} created. '
             'Be sure to run the data migrations:\n\n'
-            '`{} migrate [options]`'
-        ).format(settings.PROJECT_NAME, os.path.basename(sys.argv[0])))
+            f'`{os.path.basename(sys.argv[0])} migrate [options]`',
+        )

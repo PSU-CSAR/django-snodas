@@ -1,10 +1,9 @@
 from getpass import getpass
 
-from psycopg2 import connect
-
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
+from psycopg2 import connect
 
 from ..utils import get_default
 
@@ -22,20 +21,20 @@ class Command(BaseCommand):
             '--drop-user',
             action='store_true',
             help='Drop the DB user for the project. '
-                 'Requires that admin user and password be specified.',
+            'Requires that admin user and password be specified.',
         )
         parser.add_argument(
             '-U',
             '--admin-user',
             default='postgres',
             help='The admin postgres user to use to create the DB. '
-                 'Default is postgres.',
+            'Default is postgres.',
         )
         parser.add_argument(
             '-P',
             '--admin-pass',
             help='The admin postgres user to use to create the DB. '
-                 'Default is to prompt user for input.',
+            'Default is to prompt user for input.',
         )
         parser.add_argument(
             '--noinput',
@@ -50,17 +49,17 @@ class Command(BaseCommand):
             action='store',
             default='default',
             help='Use this router-database other than '
-                 'the default defined in settings.py',
+            'the default defined in settings.py',
         )
 
     def handle(self, *args, **options):
         if settings.DEPLOYMENT_TYPE == 'production':
-            raise CommandError('I won\'t run on a production database. Sorry.')
+            raise CommandError("I won't run on a production database. Sorry.")
 
         router = options.get('router')
         dbinfo = settings.DATABASES.get(router)
         if dbinfo is None:
-            raise CommandError('Unknown database router {}'.format(router))
+            raise CommandError(f'Unknown database router {router}')
 
         dbuser = dbinfo.get('USER')
         dbpass = dbinfo.get('PASSWORD')
@@ -70,7 +69,7 @@ class Command(BaseCommand):
             dbpass = get_default(
                 options,
                 'admin_pass',
-                getpass('Please enter the {} user password: '.format(dbuser)),
+                getpass(f'Please enter the {dbuser} user password: '),
             )
 
         dbname = dbinfo.get('NAME')
@@ -79,11 +78,12 @@ class Command(BaseCommand):
 
         if options.get('interactive'):
             confirm = input(
-                ('You have requested to drop the database.\n'
-                 'This will IRREVERSIBLY DESTROY\n'
-                 'ALL data in the database "{}".\n'
-                 'Are you sure you want to do this?\n'
-                 'Type "yes" to continue, or "no" to cancel: ').format(dbname))
+                'You have requested to drop the database.\n'
+                'This will IRREVERSIBLY DESTROY\n'
+                f'ALL data in the database "{dbname}".\n'
+                'Are you sure you want to do this?\n'
+                'Type "yes" to continue, or "no" to cancel: '
+            )
         else:
             confirm = 'yes'
 
@@ -104,7 +104,7 @@ class Command(BaseCommand):
             )
             conn.autocommit = True
             with conn.cursor() as cursor:
-                cursor.execute('DROP DATABASE IF EXISTS {}'.format(dbname))
+                cursor.execute(f'DROP DATABASE IF EXISTS {dbname}')
 
                 if options.get('drop_user'):
                     cursor.execute(

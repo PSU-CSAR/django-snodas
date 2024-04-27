@@ -1,24 +1,20 @@
+import glob
+import gzip
 import os
 import re
-import gzip
-import glob
-import tarfile
 import shutil
-
+import tarfile
 from io import BytesIO
 
+from django.conf import settings
+from django.contrib.gis.db.backends.postgis.pgraster import to_pgraster
+from django.contrib.gis.gdal import GDALRaster
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
-from django.conf import settings
-
-from django.contrib.gis.gdal import GDALRaster
-from django.contrib.gis.db.backends.postgis.pgraster import to_pgraster
 
 from ...exceptions import SNODASError
 from ...utils.filesystem import tempdirectory
-
-from ..utils import to_namedtuple, FullPaths, is_file, is_dir, chain_streams
-
+from ..utils import FullPaths, chain_streams, is_dir, is_file, to_namedtuple
 
 HDR_EXTS = ('.Hdr', '.txt')
 
@@ -57,15 +53,17 @@ class Command(BaseCommand):
             '--output-dir',
             action=FullPaths,
             type=is_dir,
-            help=('Path to a directory in which to retain the expanded files. '
-                  'Default is to use a temp directory deleted on exit.'),
+            help=(
+                'Path to a directory in which to retain the expanded files. '
+                'Default is to use a temp directory deleted on exit.'
+            ),
         )
 
     def handle(self, *args, **options):
         if settings.DEBUG:
             raise CommandError(
-               'Debug logging can cause problems for loadraster. '
-               'Turn off DEBUG before running loadraster.'
+                'Debug logging can cause problems for loadraster. '
+                'Turn off DEBUG before running loadraster.',
             )
         rasters = self.extract_snodas_data(
             options['snodas_tar'],
@@ -75,17 +73,17 @@ class Command(BaseCommand):
 
         try:
             raster_streams = [
-                    rasters['swe']['raster'],
-                    rasters['depth']['raster'],
-                    rasters['runoff']['raster'],
-                    rasters['sublimation']['raster'],
-                    rasters['sublimation_blowing']['raster'],
-                    rasters['precip_solid']['raster'],
-                    rasters['precip_liquid']['raster'],
-                    # early data have missing average temp
-                    # (and also has a funky undocumented grid)
-                    # but all modern data should have it
-                    rasters['average_temp']['raster'],
+                rasters['swe']['raster'],
+                rasters['depth']['raster'],
+                rasters['runoff']['raster'],
+                rasters['sublimation']['raster'],
+                rasters['sublimation_blowing']['raster'],
+                rasters['precip_solid']['raster'],
+                rasters['precip_liquid']['raster'],
+                # early data have missing average temp
+                # (and also has a funky undocumented grid)
+                # but all modern data should have it
+                rasters['average_temp']['raster'],
             ]
         except KeyError as e:
             raise SNODASError('SNODAS data appears incomplete') from e
@@ -93,7 +91,7 @@ class Command(BaseCommand):
         raster_streams.append(BytesIO(date.encode()))
         ftype = chain_streams(raster_streams, sep=b'\t')
 
-        print('Inserting record into database for date {}'.format(date))
+        print(f'Inserting record into database for date {date}')
         with connection.cursor() as cursor:
             try:
                 cursor.copy_expert(f'copy {self.table} from stdin', ftype)
@@ -105,14 +103,14 @@ class Command(BaseCommand):
 
     @staticmethod
     def parse_filename(path):
-        '''Parse out the file info from a provided filename.
+        """Parse out the file info from a provided filename.
         Please refer to the SNODAS naming docs for more information.
 
-        https://nsidc.org/data/g02158#untar_daily_nc'''
+        https://nsidc.org/data/g02158#untar_daily_nc"""
         name, ext = os.path.splitext(os.path.basename(path))
 
         if ext not in HDR_EXTS:
-            raise SNODASError('File ext {} is unknown'.format(ext))
+            raise SNODASError(f'File ext {ext} is unknown')
 
         matches = re.match(
             (
@@ -135,7 +133,7 @@ class Command(BaseCommand):
         )
 
         if not matches:
-            raise SNODASError('Filename could not be parsed: {}'.format(name))
+            raise SNODASError(f'Filename could not be parsed: {name}')
 
         info = matches.groupdict()
         info['product_code'] = int(info['product_code'])
@@ -165,13 +163,13 @@ class Command(BaseCommand):
 
     @staticmethod
     def trim_header(hdr):
-        '''gdal has a header line length limit of
+        """gdal has a header line length limit of
         256 chars for <2.3.0, or 1024 chars for >=2.3.0,
-        but we trim to the smaller size to be safe.'''
+        but we trim to the smaller size to be safe."""
         lines = []
         with open(hdr) as f:
             for line in f:
-                lines.append(line[:min(len(line), 254)] + '\n')
+                lines.append(line[: min(len(line), 254)] + '\n')
 
         with open(hdr, 'w') as f:
             f.writelines(lines)
@@ -182,43 +180,34 @@ class Command(BaseCommand):
             if not outdir:
                 outdir = temp
             tar = tarfile.open(snodas_tar)
-            print('Extracting {}\n\tto temp dir {}'.format(snodas_tar, temp))
+            print(f'Extracting {snodas_tar}\n\tto temp dir {temp}')
             tar.extractall(temp)
 
             gzipped = glob.glob(os.path.join(temp, '*.gz'))
             for idx, f in enumerate(gzipped, start=1):
                 print(
-                    'Unzipping file {} of {}: {}'.format(
-                        idx,
-                        len(gzipped),
-                        os.path.basename(f),
-                    ),
+                    f'Unzipping file {idx} of {len(gzipped)}: {os.path.basename(f)}',
                 )
                 outpath = os.path.join(
                     outdir,
                     os.path.splitext(os.path.basename(f))[0],
                 )
-                with gzip.open(f, 'rb') as f_in, \
-                        open(outpath, 'wb') as f_out:
+                with gzip.open(f, 'rb') as f_in, open(outpath, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
 
             hdrs = []
             for ext in HDR_EXTS:
-                hdrs.extend(glob.glob(os.path.join(outdir, '*{}'.format(ext))))
+                hdrs.extend(glob.glob(os.path.join(outdir, f'*{ext}')))
 
             for idx, hdr in enumerate(hdrs, start=1):
                 print(
-                    'Importing {} of {}: {}'.format(
-                        idx,
-                        len(hdrs),
-                        os.path.basename(hdr),
-                    ),
+                    f'Importing {idx} of {len(hdrs)}: {os.path.basename(hdr)}',
                 )
                 self.trim_header(hdr)
                 file_info = self.parse_filename(hdr)
                 rasters[self.snodas_type_from_file_info(file_info)] = {
                     'raster': BytesIO(to_pgraster(GDALRaster(hdr)).hex().encode()),
-                    'info': file_info
+                    'info': file_info,
                 }
         return rasters
 
@@ -230,7 +219,7 @@ class Command(BaseCommand):
 
         if len(dates) > 1:
             raise SNODASError(
-                "SNODAS rasters not all from same date per filenames",
+                'SNODAS rasters not all from same date per filenames',
             )
 
         return dates.pop()

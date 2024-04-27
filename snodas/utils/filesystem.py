@@ -2,8 +2,9 @@ from contextlib import contextmanager
 
 
 def makedirs(path, *args, **kwargs):
-    import os
     import errno
+    import os
+
     try:
         os.makedirs(path, *args, **kwargs)  # exist_ok only in Python>3.2
     except TypeError as e:
@@ -25,22 +26,22 @@ def generate_postfix(iteration, sequential=False):
     """used to generate the postfixes for the
     make_unique_directory function"""
     from .misc import random_string
+
     # a sequential postfix uses integers
     if sequential:
-        postfix = "_" + iteration
+        postfix = '_' + iteration
     else:
         # otherwise we append a unique string
         # the length of the string is 4 char,
         # but increases by 1 every 100 iterations
         length = 4 + (1 * (iteration % 100))
-        postfix = "_" + random_string(length)
+        postfix = '_' + random_string(length)
     return postfix
 
 
-def make_unique_directory(name, path,
-                          limit=None,
-                          sequential_postfix=False,
-                          always_append=False):
+def make_unique_directory(
+    name, path, limit=None, sequential_postfix=False, always_append=False
+):
     """Iterate though postfixes to a directory name until
     the name is unique and the directory can be created. If
     the original name is unique no postfix will be appended,
@@ -69,6 +70,7 @@ def make_unique_directory(name, path,
     will attempt to create the directory `/home/foo/bar`, appending
     a postfix as desribed above until the directory can be created."""
     import os
+
     from exceptions import LimitError
 
     # if no limit then set to True so while loop will never stop
@@ -79,11 +81,10 @@ def make_unique_directory(name, path,
         pass
     # if limit is neither of these then we don't know what to do
     else:
-        raise TypeError("limit is not positive integer or None." +
-                        " Unable to proceed")
+        raise TypeError('limit is not positive integer or None.' + ' Unable to proceed')
 
     # postfix starts as empty string unless always_append is True
-    postfix = ""
+    postfix = ''
     if always_append is True:
         postfix = generate_postfix(0, sequential_postfix)
 
@@ -112,8 +113,9 @@ def make_unique_directory(name, path,
         if limit is not True:
             limit -= 1
             if limit <= 0:
-                raise LimitError("Postfix limit was reached before directory" +
-                                 " could be created.")
+                raise LimitError(
+                    'Postfix limit was reached before directory' + ' could be created.'
+                )
 
         # generate the next postfix based on the iteration
         postfix = generate_postfix(iteration, sequential_postfix)
@@ -122,12 +124,13 @@ def make_unique_directory(name, path,
 
 
 @contextmanager
-def tempdirectory(suffix="", prefix="", dir=None, do_not_remove=False):
+def tempdirectory(suffix='', prefix='', dir=None, do_not_remove=False):
     """A context manager for creating a temporary directory
     that will automatically be removed when it is no longer
     in context."""
-    from tempfile import mkdtemp
     from shutil import rmtree
+    from tempfile import mkdtemp
+
     tmpdir = mkdtemp(suffix=suffix, prefix=prefix, dir=dir)
     was_exception = False
     try:
@@ -142,6 +145,7 @@ def tempdirectory(suffix="", prefix="", dir=None, do_not_remove=False):
 
 def get_path_from_tempdir(tempdir):
     import os
+
     tempdircontents = os.listdir(tempdir)
 
     directories = []
@@ -158,7 +162,7 @@ def get_path_from_tempdir(tempdir):
     return path
 
 
-class FileWrapper(object):
+class FileWrapper:
     """Wrapper to convert file-like objects to iterables,
     based on the FileWrapper class from wsgiref, but modified to
     take a start and end point to allow serving byte ranges in

@@ -410,7 +410,7 @@ class Command(BaseCommand):
                 # For now, we only handle unsigned byte
                 if pixtype == 4:
                     band = np.frombuffer(raw, dtype='uint8', count=h['width']*h['height'], offset=offset+1)
-                    img.append((np.reshape(band, ((h['height'], h['width'])))))
+                    img.append(np.reshape(band, ((h['height'], h['width']))))
                     offset = offset + 2 + h['width']*h['height']
                 # to do: handle other data types
 

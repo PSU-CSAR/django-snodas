@@ -1,6 +1,7 @@
 """
 Django settings for snodas project.
 """
+
 import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -14,13 +15,12 @@ ALLOWED_HOSTS = [
     SITE_DOMAIN_NAME,
 ]
 
-ALLOWED_HOSTS += ['{}.{}'.format(sd, SITE_DOMAIN_NAME) for sd in SUBDOMAINS]
+ALLOWED_HOSTS += [f'{sd}.{SITE_DOMAIN_NAME}' for sd in SUBDOMAINS]
 
 # Application definition
 INSTALLED_APPS = (
     # project
     'snodas',
-
     # django libs
     'django.contrib.gis',
 )
@@ -36,8 +36,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
         'APP_DIRS': True,
-        'OPTIONS': {
-        },
+        'OPTIONS': {},
     },
 ]
 
@@ -56,12 +55,12 @@ AUTH_USER_MODEL = 'auth.User'
 
 ## URL PATH SETTINGS
 # settings for rest framework
-REST_ROOT = ""
+REST_ROOT = ''
 
 MIGRATION_MODULES = {
     'sites': 'snodas.fixtures.sites_migrations',
 }
 
 # project-wide email settings
-EMAIL_SUBJECT_PREFIX = "[snodas] "
-DEFAULT_FROM_EMAIL = "ebagis@pdx.edu"
+EMAIL_SUBJECT_PREFIX = '[snodas] '
+DEFAULT_FROM_EMAIL = 'ebagis@pdx.edu'

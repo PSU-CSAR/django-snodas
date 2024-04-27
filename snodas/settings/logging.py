@@ -16,7 +16,7 @@ LOG_DIR = os.path.join(BASE_DIR, 'log')
 
 _VERBOSE_FORMATTER = {
     'format': '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s',
-    'datefmt': "%d/%b/%Y %H:%M:%S",
+    'datefmt': '%d/%b/%Y %H:%M:%S',
 }
 
 
@@ -61,7 +61,7 @@ LOGGING = {
         'verbose': _VERBOSE_FORMATTER,
         'simple': {
             'format': '%(asctime)s %(name)s [%(levelname)s] %(message)s',
-            'datefmt': "%d/%b/%Y %H:%M:%S",
+            'datefmt': '%d/%b/%Y %H:%M:%S',
         },
     },
     'handlers': {

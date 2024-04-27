@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.urls import path, reverse
-
 from ninja import NinjaAPI
 from ninja.errors import HttpError
 
@@ -11,7 +10,6 @@ from snodas.views import (
     stats,
     tiles,
 )
-
 
 api = NinjaAPI()
 
@@ -28,9 +26,7 @@ def api_root(request: HttpRequest) -> types.LandingPage:
             'Portland State University (PSU) Center for Spatial '
             'Analysis and Research (CSAR) SNODAS tools API'
         ),
-        description=(
-            'API providing pourpoint/AOI metadata and SNODAS statistics'
-        ),
+        description=('API providing pourpoint/AOI metadata and SNODAS statistics'),
         links=[
             types.Link(
                 href=request.build_absolute_uri(
@@ -139,11 +135,13 @@ def get_pourpoint_by_triplet(
     response: HttpResponse,
 ):
     response['Content-Type'] = 'application/geo+json'
-    return pourpoints.get_point(station_triplet).build_links(request, api, full=True, from_triplet=True)
+    return pourpoints.get_point(station_triplet).build_links(
+        request, api, full=True, from_triplet=True
+    )
 
 
 @api.get(
-    '/pourpoints/{pourpoint_id}/stats/date-range', #/{start_date}/{end_date}/',
+    '/pourpoints/{pourpoint_id}/stats/date-range',  # /{start_date}/{end_date}/',
     response=types.PourPointStats,
     exclude_none=True,
 )
@@ -179,7 +177,7 @@ def id_stat_range_query(
 
 
 @api.get(
-    '/pourpoints/{pourpoint_id}/stats/doy', #/{month}/{day}/{start_year}/{end_year}/',
+    '/pourpoints/{pourpoint_id}/stats/doy',  # /{month}/{day}/{start_year}/{end_year}/',
     response=types.PourPointStats,
     exclude_none=True,
 )

@@ -1,4 +1,6 @@
-from django.db.backends.postgresql.base import DatabaseWrapper as PostgreSQLDatabaseWrapper
+from django.db.backends.postgresql.base import (
+    DatabaseWrapper as PostgreSQLDatabaseWrapper,
+)
 from django.db.backends.signals import connection_created
 from django.dispatch import receiver
 
@@ -10,7 +12,7 @@ def db_connection_init(sender, connection, **kwargs):
     if cmds:
         if not (isinstance(cmds, list) or isinstance(cmds, tuple)):
             raise TypeError(
-                'database CONNECTION_INIT must be tuple or list, found {}'.format(type(cmds))
+                f'database CONNECTION_INIT must be tuple or list, found {type(cmds)}',
             )
         with connection.cursor() as cursor:
             for cmd in cmds:

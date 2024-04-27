@@ -1,7 +1,4 @@
-
-
 import os
-
 from logging.handlers import RotatingFileHandler as lgRotatingFileHandler
 
 from .filesystem import makedirs
@@ -12,5 +9,7 @@ class RotatingFileHandler(lgRotatingFileHandler):
         if kwargs.pop('makedirs', False):
             makedirs(os.path.dirname(filename), exist_ok=True)
         super(RotatingFileHandler, self).__init__(
-            filename, *args, **kwargs
+            filename,
+            *args,
+            **kwargs,
         )

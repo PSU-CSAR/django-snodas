@@ -1,6 +1,4 @@
-import os
-
-#os.environ['POSTGIS_GDAL_ENABLED_DRIVERS'] = 'ENABLE_ALL'
+# os.environ['POSTGIS_GDAL_ENABLED_DRIVERS'] = 'ENABLE_ALL'
 
 # Database settings
 DATABASES = {
@@ -14,6 +12,5 @@ DATABASES = {
         'INIT_COMMANDS': [
             'SET ROLE app',
         ],
-    }
+    },
 }
-
