@@ -40,6 +40,7 @@ for string interpolation), and can contain:
 
 import os as _os
 import re as _re
+
 from glob import glob as _glob
 from types import ModuleType as _MT
 
@@ -141,7 +142,7 @@ class _QueriesFactory:
                 param = is_param.group(1)
                 if param in params:
                     raise ParseError(
-                        f"Query parameter specified more than once: '{param}'"
+                        f"Query parameter specified more than once: '{param}'",
                     )
                 params.add(param)
                 continue
@@ -151,7 +152,7 @@ class _QueriesFactory:
                 _id = is_id.group(1)
                 if _id in ids:
                     raise ParseError(
-                        f"Query identifier specified more than once: '{_id}'"
+                        f"Query identifier specified more than once: '{_id}'",
                     )
                 ids.add(_id)
                 continue
@@ -161,7 +162,7 @@ class _QueriesFactory:
                 raw = is_raw.group(1)
                 if raw in raws:
                     raise ParseError(
-                        f"Query identifier specified more than once: '{_id}'"
+                        f"Query identifier specified more than once: '{_id}'",
                     )
                 raws.add(raw)
                 continue
@@ -196,7 +197,7 @@ locals().update(
     {
         _os.path.splitext(_os.path.basename(f))[0]: _QueriesFactory.load(f)
         for f in _glob(
-            _os.path.join(_os.path.dirname(__file__), '*.sql'), recursive=False
+            _os.path.join(_os.path.dirname(__file__), '*.sql'), recursive=False,
         )
-    }
+    },
 )

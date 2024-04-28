@@ -1,4 +1,5 @@
 import logging
+
 from typing import assert_never
 
 from django.db import connection

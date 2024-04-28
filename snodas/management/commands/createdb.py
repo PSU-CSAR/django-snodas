@@ -1,5 +1,7 @@
+import contextlib
 import os
 import sys
+
 from getpass import getpass
 
 from django.conf import settings
@@ -7,19 +9,19 @@ from django.core import management
 from django.core.management.base import BaseCommand, CommandError
 from psycopg2 import ProgrammingError, connect
 
-from ..utils import get_default
-from . import dropdb
+from snodas.management.commands.dropdb import Command as DropDatabase
+from snodas.management.utils import get_default
 
 
 class Command(BaseCommand):
     help = """Creates a postgresql database for using the
     settings defined for the current instance of the project."""
 
-    requires_system_checks = []
+    requires_system_checks = []  # type: ignore  # noqa: RUF012
     can_import_settings = True
 
     def add_arguments(self, parser):
-        super(Command, self).add_arguments(parser)
+        super().add_arguments(parser)
         parser.add_argument(
             '-U',
             '--admin-user',
@@ -55,7 +57,7 @@ class Command(BaseCommand):
             help='The database owner username.',
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *_, **options) -> None:
         router = options.get('router')
         dbinfo = settings.DATABASES.get(router)
         if dbinfo is None:
@@ -77,7 +79,7 @@ class Command(BaseCommand):
 
         if options.get('drop', None):
             management.call_command(
-                dropdb.Command(),
+                DropDatabase,
                 router=router,
                 admin_user=createuser,
                 admin_pass=createpass,
@@ -94,30 +96,25 @@ class Command(BaseCommand):
             connection.autocommit = True
             with connection.cursor() as cursor:
                 # create the owner role for consistent object ownership
-                try:
+                with contextlib.suppress(ProgrammingError):
+                    # ProgrammingError means app user already exists
                     cursor.execute(f'CREATE ROLE {owner}')
-                except ProgrammingError:
-                    # app user already exists
-                    pass
 
                 # create the login user
-                try:
+                with contextlib.suppress(ProgrammingError):
+                    # ProgrammingError means login user already exsits
                     cursor.execute(
-                        f"CREATE ROLE {dbuser} WITH LOGIN ENCRYPTED PASSWORD '{dbpass}' IN ROLE {owner}",
+                        f'CREATE ROLE {dbuser} WITH LOGIN ENCRYPTED PASSWORD '
+                        f"'{dbpass}' IN ROLE {owner}",
                     )
-                except ProgrammingError:
-                    # login user already exsits
-                    pass
 
                 # create the database
                 cursor.execute(
                     f"CREATE DATABASE {dbname} WITH ENCODING 'UTF-8' OWNER {owner}",
                 )
         finally:
-            try:
-                connection.close()
-            except (NameError, AttributeError):
-                pass
+            with contextlib.suppress(NameError, AttributeError):
+                connection.close()  # type: ignore
 
         try:
             connection = connect(
@@ -137,13 +134,11 @@ class Command(BaseCommand):
                 cursor.execute('CREATE EXTENSION btree_gist')
                 cursor.execute('CREATE EXTENSION tablefunc')
         finally:
-            try:
-                connection.close()
-            except (NameError, AttributeError):
-                pass
+            with contextlib.suppress(NameError, AttributeError):
+                connection.close()  # type: ignore
 
-        print(
+        print(  # noqa: T201
             f'\nDatabase {settings.PROJECT_NAME} created. '
             'Be sure to run the data migrations:\n\n'
-            f'`{os.path.basename(sys.argv[0])} migrate [options]`',
+              f'`{os.path.basename(sys.argv[0])} migrate [options]`',  # noqa: PTH119
         )

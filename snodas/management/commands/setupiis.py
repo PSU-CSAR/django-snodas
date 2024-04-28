@@ -30,11 +30,13 @@ import os
 import subprocess
 import sys
 
+from pathlib import Path
+
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.template import Context, Template
 
-from ..utils import get_project_root
+from snodas.management.utils import PROJECT_ROOT
 
 CONFIG_FILE_NAME = 'generated.web.config'
 WAITRESS_SERVER = 'run_waitress_server.py'
@@ -64,15 +66,7 @@ WEB_CONFIG_STRING = r"""<?xml version="1.0" encoding="UTF-8"?>
         </httpPlatform>
     </system.webServer>
 </configuration>
-"""
-
-
-def library_bin_dir(python_exe):
-    return os.path.join(
-        os.path.dirname(python_exe),
-        'Library',
-        'bin',
-    )
+"""  # noqa: E501
 
 
 class Command(BaseCommand):
@@ -84,7 +78,7 @@ class Command(BaseCommand):
     Don't forget to run this command as Administrator
     """
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser) -> None:
         parser.add_argument(
             '--delete',
             action='store_true',
@@ -125,190 +119,170 @@ class Command(BaseCommand):
             r'(defaults to %SystemDrive%\inetpub\logs\LogFiles)',
         )
 
-    def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
-        self.appcmd = os.path.join(
-            os.environ['windir'],
-            'system32',
-            'inetsrv',
-            'appcmd.exe',
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.appcmd = (
+            Path(os.environ['WINDIR'])
+            / 'system32'
+            / 'inetsrv'
+            / 'appcmd.exe'
         )
-        self.project_dir = os.path.abspath(get_project_root())
-        self.web_config = os.path.join(self.project_dir, CONFIG_FILE_NAME)
+        self.project_dir = PROJECT_ROOT
+        self.web_config = self.project_dir / CONFIG_FILE_NAME
 
-        python_interpreter = sys.executable
-        self.conda_env_path = os.path.dirname(python_interpreter)
-        self.conda_exe = os.path.join(
-            os.path.dirname(os.path.dirname(self.conda_env_path)),
-            'Scripts',
-            'conda.exe',
-        )
+        python_interpreter = Path(sys.executable)
+        self.conda_env_path = python_interpreter.parent
+        self.conda_exe = self.conda_env_path.parent.parent / 'Scripts' / 'conda.exe'
 
         self.waitress_server = WAITRESS_SERVER
-        self.last_command_error = None
+        self.last_command_error: str | None = None
 
-        if not (os.path.isfile(self.conda_exe) and os.access(self.conda_exe, os.X_OK)):
+        if not (self.conda_exe.is_file() and os.access(self.conda_exe, os.X_OK)):
             raise Exception(
-                'IIS is currently only supported if running project from conda env'
+                'IIS is currently only supported if running project from conda env',
             )
 
-    def config_command(self, command, section, *args):
-        arguments = [self.appcmd, command, section]
+    def config_command(self, command, section, *args) -> subprocess.Popen[bytes]:
+        arguments: list[str] = [str(self.appcmd), command, section]
         arguments.extend(args)
         return subprocess.Popen(
-            arguments,
+            arguments,  # noqa: S603
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
 
-    def run_config_command(self, command, section, *args):
+    def run_config_command(self, command, section, *args) -> bool:
         command_process = self.config_command(command, section, *args)
-        (out, err) = command_process.communicate()
-        result = command_process.returncode == 0
-        self.last_command_error = out if not result else None
+        out, _ = command_process.communicate()
+        result: bool = command_process.returncode == 0
+        self.last_command_error = out.decode() if not result else None
         return result
 
-    def set_project_permissions(self):
+    def set_project_permissions(self) -> None:
         # set permissions on the root project directory for the IIS site user
-        cmd = [
+        cmd: list[str] = [
             'ICACLS',
-            get_project_root(),
+            str(self.project_dir),
             '/t',
             '/grant',
             rf'IIS AppPool\{settings.PROJECT_NAME}:F',
         ]
-        subprocess.check_call(cmd)
+        subprocess.check_call(cmd)  # noqa: S603
         cmd = [
             'ICACLS',
-            library_bin_dir(sys.executable),
+            str(Path(sys.executable) / 'Library' / 'bin'),
             '/t',
             '/grant',
             rf'IIS AppPool\{settings.PROJECT_NAME}:F',
         ]
-        subprocess.check_call(cmd)
+        subprocess.check_call(cmd)  # noqa: S603
 
-    def install(self, args, options):
-        if os.path.exists(self.web_config) and not options['skip_config']:
+    def install(self, **options) -> None:
+        if self.web_config.exists() and not options['skip_config']:
             raise CommandError(
-                'A web site configuration already exists in [%s] !' % self.project_dir,
+                f'A web site configuration already exists in {self.project_dir} !',
             )
 
         # create web.config
         if not options['skip_config']:
-            print('Creating web.config')
+            print('Creating web.config')  # noqa: T201
             template = Template(WEB_CONFIG_STRING)
-            with open(self.web_config, 'w') as f:
-                f.write(template.render(Context(self.__dict__)))
+            self.web_config.write_text(template.render(Context(self.__dict__)))
 
         # Create sites
-        if not options['skip_site']:
-            site_name = options['site_name']
-            print('Creating application pool with name %s' % site_name)
-            if not self.run_config_command('add', 'apppool', '/name:%s' % site_name):
-                raise CommandError(
-                    'The Application Pool creation has failed with the following message :\n%s'
-                    % self.last_command_error,
-                )
+        if options['skip_site']:
+            return
 
-            binding = (
-                options.get('binding')
-                or '{}://{}:{}'.format(
-                    'https',
-                    settings.SITE_DOMAIN_NAME,
-                    443,
-                ),
-            )
-
-            print('Creating the site')
-            if not self.run_config_command(
-                'add',
-                'site',
-                '/name:%s' % site_name,
-                '/bindings:%s' % binding,
-                '/physicalPath:%s' % self.project_dir,
-            ):
-                raise CommandError(
-                    'The site creation has failed with the following message :\n%s'
-                    % self.last_command_error,
-                )
-
-            print('Adding the site to the application pool')
-            if not self.run_config_command(
-                'set', 'app', '%s/' % site_name, '/applicationPool:%s' % site_name
-            ):
-                raise CommandError(
-                    'Adding the site to the application pool has failed with the following message :\n%s'
-                    % self.last_command_error,
-                )
-
-            if static_is_local and static_needs_virtual_dir:
-                print(
-                    'Creating virtual directory for [%s] in [%s]'
-                    % (static_dir, static_url)
-                )
-                if not self.run_config_command(
-                    'add',
-                    'vdir',
-                    '/app.name:%s/' % site_name,
-                    '/path:/%s' % static_name,
-                    '/physicalPath:%s' % static_dir,
-                ):
-                    raise CommandError(
-                        'Adding the static virtual directory has failed with the following message :\n%s'
-                        % self.last_command_error,
-                    )
-
-            log_dir = options['log_dir']
-            if log_dir:
-                if not self.run_config_command(
-                    'set', 'site', '%s/' % site_name, '/logFile.directory:%s' % log_dir
-                ):
-                    raise CommandError(
-                        'Setting the logging directory has failed with the following message :\n%s'
-                        % self.last_command_error,
-                    )
-
-    def delete(self, args, options):
-        if not os.path.exists(self.web_config) and not options['skip_config']:
+        site_name = options['site_name']
+        print(f'Creating application pool with name {site_name}')  # noqa: T201
+        if not self.run_config_command(
+            'add',
+            'apppool',
+            f'/name:{site_name}',
+        ):
             raise CommandError(
-                'A web site configuration does not exists in [%s] !' % self.project_dir
+                'The Application Pool creation has failed with '
+                'the following message :\n'
+                f'{self.last_command_error}',
             )
 
+        binding: str = options.get('binding', f'https://{settings.SITE_DOMAIN_NAME}:443')
+
+        print('Creating the site')  # noqa: T201
+        if not self.run_config_command(
+            'add',
+            'site',
+            f'/name:{site_name}',
+            f'/bindings:{binding}',
+            f'/physicalPath:{self.project_dir}',
+        ):
+            raise CommandError(
+                'The site creation has failed with the following message :\n'
+                f'{self.last_command_error}',
+            )
+
+        print('Adding the site to the application pool')  # noqa: T201
+        if not self.run_config_command(
+            'set',
+            'app',
+            f'{site_name}/',
+            f'/applicationPool:{site_name}',
+        ):
+            raise CommandError(
+                'Adding the site to the application pool has failed '
+                'with the following message :\n'
+                f'{self.last_command_error}',
+            )
+
+        log_dir = options['log_dir']
+        if log_dir and not self.run_config_command(
+            'set',
+            'site',
+            f'{site_name}/',
+            f'/logFile.directory:{log_dir}',
+        ):
+            raise CommandError(
+                'Setting the logging directory has failed with '
+                'the following message :\n'
+                f'{self.last_command_error}',
+            )
+
+    def delete(self, **options) -> None:
         if not options['skip_config']:
-            print('Removing site configuration')
-            os.remove(self.web_config)
+            print('Removing site configuration')  # noqa: T201
+            self.web_config.unlink(missing_ok=True)
 
         if not options['skip_site']:
             site_name = options['site_name']
-            print('Removing The site')
+            print('Removing The site')  # noqa: T201
             if not self.run_config_command('delete', 'site', site_name):
                 raise CommandError(
-                    'Removing the site has failed with the following message :\n%s'
-                    % self.last_command_error,
+                    'Removing the site has failed with the following message :\n'
+                    f'{self.last_command_error}',
                 )
 
-            print('Removing The application pool')
+            print('Removing The application pool')  # noqa: T201
             if not self.run_config_command('delete', 'apppool', site_name):
                 raise CommandError(
-                    'Removing the site has failed with the following message :\n%s'
-                    % self.last_command_error,
+                    'Removing the site has failed with the following message :\n'
+                    f'{self.last_command_error}',
                 )
 
-    def handle(self, *args, **options):
+    def handle(self, *_, **options) -> None:
         if options['site_name'] == '':
             options['site_name'] = settings.PROJECT_NAME
 
-        if not os.path.exists(self.appcmd):
+        if not self.appcmd.exists():
             raise CommandError(
                 'It seems that IIS is not installed on your machine',
             )
 
         if options['delete']:
-            self.delete(args, options)
+            self.delete(**options)
         else:
-            self.install(args, options)
+            self.install(**options)
             self.set_project_permissions()
-            print(
+            print(  # noqa: T201
                 f"""
 PLEASE NOTE: This command is unable to set
 the certificate to use for the specified binding.
@@ -323,4 +297,4 @@ set the correct certificate:
 
 
 if __name__ == '__main__':
-    print('This is supposed to be run as a django management command')
+    print('This is supposed to be run as a django management command')  # noqa: T201

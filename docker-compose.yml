@@ -4,7 +4,8 @@ services:
     build: .
     restart: always
     environment:
-      - POSTGRES_USER=${PGUSER:-postgres}
-      - POSTGRES_PASSWORD=${PGPASSWORD:-password}
+      POSTGRES_USER: "${PGUSER:-postgres}"
+      POSTGRES_PASSWORD: "${PGPASSWORD:-password}"
+      POSTGIS_GDAL_ENABLED_DRIVERS: 'GTiff PNG SNODAS'
     ports:
       - '${PGPORT:-5432}:5432'

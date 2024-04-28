@@ -64,20 +64,31 @@ def api_root(request: HttpRequest) -> types.LandingPage:
 
 
 # Tile routes
-api.get(
+@api.get(
     '/tiles/',
+    response=tiles.DateList,
     include_in_schema=settings.DEBUG,
-)(tiles.list_dates)
+)
+def tiles_list_dates(
+    request: HttpRequest,
+):
+    return tiles.list_dates()
 
-api.get(
-    '/tiles/date-params/',
+@api.get(
+    '/tiles/{date}/{zoom}/{x}/{y}.png',
     include_in_schema=settings.DEBUG,
-)(tiles.date_params)
-
-api.get(
-    '/tiles/{date}/{zoom}/{x}/{y}.{format}/',
-    include_in_schema=settings.DEBUG,
-)(tiles.get_tile)
+)
+def get_tile(
+    request: HttpRequest,
+    date: types.Date,
+    zoom: types.Zoom,
+    x: int,
+    y: int,
+):
+    return HttpResponse(
+        tiles.get_tile(date, zoom, x, y),
+        content_type='application/png',
+    )
 
 
 # Pourpoint routes
@@ -136,7 +147,7 @@ def get_pourpoint_by_triplet(
 ):
     response['Content-Type'] = 'application/geo+json'
     return pourpoints.get_point(station_triplet).build_links(
-        request, api, full=True, from_triplet=True
+        request, api, full=True, from_triplet=True,
     )
 
 

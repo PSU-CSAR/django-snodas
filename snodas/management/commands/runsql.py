@@ -1,34 +1,48 @@
 # based in part on the loaddata command from django
 # some of the code falls under that django copyright
+import contextlib
 import gzip
-import os
 import sys
+
+from pathlib import Path
 from pprint import pprint
+from types import ModuleType
 from zipfile import ZipFile
 
 import sqlparse
+
 from django.core.management.base import BaseCommand, CommandError
 from django.db import DEFAULT_DB_ALIAS, connections, transaction
 
-try:
-    import bz2
+from snodas.management import utils
 
-    has_bz2 = True
-except ImportError:
-    has_bz2 = False
+bz2: ModuleType | None = None
+with contextlib.suppress(ImportError):
+    import bz2
 
 
 READ_STDIN = '-'
 
 
 class SingleZipReader(ZipFile):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         if len(self.namelist()) != 1:
             raise ValueError('Zip-compressed sql must contain only one file.')
 
     def read(self):
-        return super().read(self, self.namelist()[0])
+        return super().read(self.namelist()[0])
+
+
+readers = {
+    None: (open, 'rb'),
+    '.sql': (open, 'rb'),
+    '.gz': (gzip.GzipFile, 'rb'),
+    '.zip': (SingleZipReader, 'r'),
+    'stdin': (lambda *_: sys.stdin, None),
+}
+if bz2:
+    readers['.bz2'] = (bz2.BZ2File, 'r')
 
 
 class Command(BaseCommand):
@@ -41,30 +55,26 @@ class Command(BaseCommand):
         'one sql file in the command line.'
     )
 
-    readers = {
-        None: (open, 'rb'),
-        '.sql': (open, 'rb'),
-        '.gz': (gzip.GzipFile, 'rb'),
-        '.zip': (SingleZipReader, 'r'),
-        'stdin': (lambda *args: sys.stdin, None),
-    }
-    if has_bz2:
-        readers['.bz2'] = (bz2.BZ2File, 'r')
+    readers = readers
 
-    requires_system_checks = []
+    requires_system_checks = []  # type: ignore  # noqa: RUF012
 
     def add_arguments(self, parser):
-        super(Command, self).add_arguments(parser)
+        super().add_arguments(parser)
         parser.add_argument(
             'args',
             metavar='sqlfiles',
+            type=utils.file,
             nargs='+',
             help='sql files to execute. Can also use - to pass commands via stdin.',
         )
         parser.add_argument(
             '--database',
             default=DEFAULT_DB_ALIAS,
-            help='Nominates a specific database to load fixtures into. Defaults to the "default" database.',
+            help=(
+                'Nominates a specific database to load fixtures into. '
+                'Defaults to the "default" database.',
+            ),
         )
         parser.add_argument(
             '--no-transaction',
@@ -73,7 +83,7 @@ class Command(BaseCommand):
             help='Do not execute sql in transactions. Default false.',
         )
 
-    def handle(self, *sqlfiles, **options):
+    def handle(self, *sqlfiles, **options) -> None:
         self.verbosity = options['verbosity']
         db = options['database']
         self.conn = connections[db]
@@ -109,7 +119,7 @@ class Command(BaseCommand):
         if transaction.get_autocommit(db):
             self.conn.close()
 
-    def runsql(self, sql):
+    def runsql(self, sql) -> None:
         for statement in sqlparse.split(sql):
             if not statement:
                 continue
@@ -118,31 +128,31 @@ class Command(BaseCommand):
                 cur.execute(statement)
                 try:
                     self.vprint(1, cur.fetchall(), pretty=True)
-                except:
+                except Exception:  # noqa: BLE001
                     self.vprint(1, cur.statusmessage)
 
-    def vprint(self, level, *args, **kwargs):
+    def vprint(self, level, *args, **kwargs) -> None:
         _print = print
         if kwargs.pop('pretty', False):
-            _print = pprint
+            _print = pprint  # type: ignore
         if self.verbosity >= level:
             _print(*args, **kwargs)
 
-    def get_reader(self, sqlfile):
+    def get_reader(self, sqlfile: Path):
         """
         Return file reader for file format per sqlfile name.
         """
         if sqlfile == READ_STDIN:
             return self.readers['stdin']
 
-        if not os.path.isfile(sqlfile):
+        if not sqlfile.is_file():
             raise CommandError(
                 f'sql file {sqlfile} could not be found',
             )
 
         try:
-            return self.readers[os.path.splitext(sqlfile)[1]]
-        except KeyError:
+            return self.readers[sqlfile.suffix]
+        except KeyError as e:
             raise CommandError(
                 f'sql file {sqlfile} is not a known format.',
-            )
+            ) from e

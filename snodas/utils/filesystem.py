@@ -40,7 +40,7 @@ def generate_postfix(iteration, sequential=False):
 
 
 def make_unique_directory(
-    name, path, limit=None, sequential_postfix=False, always_append=False
+    name, path, limit=None, sequential_postfix=False, always_append=False,
 ):
     """Iterate though postfixes to a directory name until
     the name is unique and the directory can be created. If
@@ -114,7 +114,7 @@ def make_unique_directory(
             limit -= 1
             if limit <= 0:
                 raise LimitError(
-                    'Postfix limit was reached before directory' + ' could be created.'
+                    'Postfix limit was reached before directory' + ' could be created.',
                 )
 
         # generate the next postfix based on the iteration
