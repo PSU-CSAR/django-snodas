@@ -71,10 +71,13 @@ select = [
     'W',
 
 ]
+# settings are a mess, ignore them for now
+exclude = ["snodas/settings/*"]
 
 [tool.ruff.lint.per-file-ignores]
 '__init__.py' = ['E402']
-'tests/**/*' = ['T201']
+'tests/**/*' = ['T201', 'S101']
+'snodas/migrations/*' = ['RUF012']
 
 [tool.ruff.lint.isort]
 lines-between-types = 1
