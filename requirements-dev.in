@@ -1,0 +1,9 @@
+mypy
+pip-tools
+pre-commit
+pre-commit-hooks
+pytest
+pytest-cov
+ruff
+types-PyYAML
+types-waitress

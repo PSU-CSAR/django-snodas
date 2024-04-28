@@ -1,0 +1,90 @@
+[build-system]
+requires = [
+    'setuptools',
+]
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'django-snodas'
+authors = [
+    {name = 'Jarrett Keifer', email = 'jkeifer@pdx.edu'},
+]
+description = 'Interface to SNODAS daily and aggregate rasters as a tile service and for analytical functions.'
+requires-python = '>=3.12'
+dependencies = [
+    'Django',
+    'django-ninja',
+    'django-split-settings',
+    'django-cors-headers',
+    'psycopg2-binary',
+    'pydantic',
+    'pyyaml',
+    'sqlparse',
+]
+dynamic = [
+  'readme',
+]
+version = '0.0.1'
+
+[project.scripts]
+snodas = 'manage:main'
+
+[project.urls]
+Repository = 'https://github.com/PSU-CSAR/django-snodas'
+
+[tool.setuptools]
+packages = ['snodas']
+py-modules = ['manage']
+
+[tool.setuptools.dynamic]
+readme = {file = 'README.md'}
+
+[tool.ruff.format]
+quote-style = 'single'
+
+[tool.ruff.lint]
+# https://docs.astral.sh/ruff/rules/
+select = [
+    'B',
+    'BLE',
+    'C4',
+    'C90',
+    'COM',
+    'DTZ',
+    'E',
+    'ERA',
+    'F',
+    'FA',
+    'G',
+    'I',
+    'INP',
+    'N',
+    'NPY',
+    'PT',
+    'PTH',
+    'RET',
+    'RUF',
+    'S',
+    'SIM',
+    'T20',
+    'UP',
+    'W',
+
+]
+# settings are a mess, ignore them for now
+exclude = ['snodas/settings/*']
+
+[tool.ruff.lint.per-file-ignores]
+'__init__.py' = ['E402']
+'tests/**/*' = ['T201', 'S101']
+'snodas/migrations/*' = ['RUF012']
+
+[tool.ruff.lint.isort]
+lines-between-types = 1
+
+[tool.mypy]
+ignore_missing_imports = true
+scripts_are_modules = true
+exclude = [
+    '^snodas/settings/.*\.py$',
+]

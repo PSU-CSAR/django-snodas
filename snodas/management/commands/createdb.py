@@ -1,40 +1,39 @@
+import contextlib
 import os
 import sys
 
 from getpass import getpass
 
-from psycopg2 import connect, ProgrammingError
-
 from django.conf import settings
 from django.core import management
 from django.core.management.base import BaseCommand, CommandError
+from psycopg2 import ProgrammingError, connect
 
-from ..utils import get_default
-
-from . import dropdb
+from snodas.management.commands.dropdb import Command as DropDatabase
+from snodas.management.utils import get_default
 
 
 class Command(BaseCommand):
     help = """Creates a postgresql database for using the
     settings defined for the current instance of the project."""
 
-    requires_system_checks = []
+    requires_system_checks = []  # type: ignore  # noqa: RUF012
     can_import_settings = True
 
     def add_arguments(self, parser):
-        super(Command, self).add_arguments(parser)
+        super().add_arguments(parser)
         parser.add_argument(
             '-U',
             '--admin-user',
             default='postgres',
             help='The admin postgres user to use to create the DB. '
-                 'Default is postgres.',
+            'Default is postgres.',
         )
         parser.add_argument(
             '-P',
             '--admin-pass',
             help='The admin postgres user to use to create the DB. '
-                 'Default is to prompt user for input.',
+            'Default is to prompt user for input.',
         )
         parser.add_argument(
             '-R',
@@ -42,7 +41,7 @@ class Command(BaseCommand):
             action='store',
             default='default',
             help='Use this router-database other than '
-                 'the default defined in settings.py',
+            'the default defined in settings.py',
         )
         parser.add_argument(
             '-D',
@@ -55,21 +54,21 @@ class Command(BaseCommand):
             '-o',
             '--owner',
             default='app',
-            help='The database owner username.'
+            help='The database owner username.',
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *_, **options) -> None:
         router = options.get('router')
         dbinfo = settings.DATABASES.get(router)
         if dbinfo is None:
-            raise CommandError("Unknown database router %s" % router)
+            raise CommandError('Unknown database router %s' % router)
 
         owner = options.get('owner')
         createuser = options.get('admin_user')
         createpass = get_default(
             options,
             'admin_pass',
-            getpass('Please enter the {} user password: '.format(createuser)),
+            getpass(f'Please enter the {createuser} user password: '),
         )
 
         dbuser = dbinfo.get('USER')
@@ -80,7 +79,7 @@ class Command(BaseCommand):
 
         if options.get('drop', None):
             management.call_command(
-                dropdb.Command(),
+                DropDatabase,
                 router=router,
                 admin_user=createuser,
                 admin_pass=createpass,
@@ -97,37 +96,25 @@ class Command(BaseCommand):
             connection.autocommit = True
             with connection.cursor() as cursor:
                 # create the owner role for consistent object ownership
-                try:
-                    cursor.execute("CREATE ROLE {}".format(owner))
-                except ProgrammingError:
-                    # app user already exists
-                    pass
+                with contextlib.suppress(ProgrammingError):
+                    # ProgrammingError means app user already exists
+                    cursor.execute(f'CREATE ROLE {owner}')
 
                 # create the login user
-                try:
+                with contextlib.suppress(ProgrammingError):
+                    # ProgrammingError means login user already exsits
                     cursor.execute(
-                        "CREATE ROLE {} WITH LOGIN ENCRYPTED PASSWORD '{}' IN ROLE {}".format(
-                            dbuser,
-                            dbpass,
-                            owner,
-                        ),
+                        f'CREATE ROLE {dbuser} WITH LOGIN ENCRYPTED PASSWORD '
+                        f"'{dbpass}' IN ROLE {owner}",
                     )
-                except ProgrammingError:
-                    # login user already exsits
-                    pass
 
                 # create the database
                 cursor.execute(
-                    'CREATE DATABASE {} WITH ENCODING \'UTF-8\' OWNER {}'.format(
-                        dbname,
-                        owner,
-                    ),
+                    f"CREATE DATABASE {dbname} WITH ENCODING 'UTF-8' OWNER {owner}",
                 )
         finally:
-            try:
-                connection.close()
-            except (NameError, AttributeError):
-                pass
+            with contextlib.suppress(NameError, AttributeError):
+                connection.close()  # type: ignore
 
         try:
             connection = connect(
@@ -145,14 +132,13 @@ class Command(BaseCommand):
                 cursor.execute('CREATE EXTENSION postgis_raster CASCADE')
                 cursor.execute('CREATE EXTENSION pg_tms CASCADE')
                 cursor.execute('CREATE EXTENSION btree_gist')
+                cursor.execute('CREATE EXTENSION tablefunc')
         finally:
-            try:
-                connection.close()
-            except (NameError, AttributeError):
-                pass
+            with contextlib.suppress(NameError, AttributeError):
+                connection.close()  # type: ignore
 
-        print((
-            '\nDatabase {} created. '
+        print(  # noqa: T201
+            f'\nDatabase {settings.PROJECT_NAME} created. '
             'Be sure to run the data migrations:\n\n'
-            '`{} migrate [options]`'
-        ).format(settings.PROJECT_NAME, os.path.basename(sys.argv[0])))
+            f'`{os.path.basename(sys.argv[0])} migrate [options]`',  # noqa: PTH119
+        )

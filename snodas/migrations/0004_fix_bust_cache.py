@@ -5,7 +5,7 @@ from snodas.utils.migrations import migration_sql
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('snodas', '0004_fix_bust_cache'),
+        ('snodas', '0003_pourpoint_unique'),
     ]
 
     operations = [

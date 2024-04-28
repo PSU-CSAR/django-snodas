@@ -1,20 +1,23 @@
-from __future__ import print_function, absolute_import
-
-import os
-import sys
-import yaml
 import argparse
 import subprocess
+import sys
 import warnings
 
+from dataclasses import dataclass
 from getpass import getpass
+from pathlib import Path
+from typing import Self
+
+import yaml
 
 try:
     from django.core.management.base import (
-        BaseCommand, CommandError, CommandParser
+        BaseCommand,
+        CommandError,
+        CommandParser,
     )
 except ImportError:
-    BaseCommand = object
+    BaseCommand = None
 
 # if we are calling this from the install command in snodas.py,
 # this import will fail with the error "attempted a relative
@@ -23,61 +26,89 @@ except ImportError:
 # loaded, so we add the utils to the path in snodas.py and
 # import that module here directly.
 try:
-    from .. import utils
-except ValueError:
-    import utils
-except ImportError:
-    import utils
+    from snodas.management import utils
+except (ValueError, ImportError):
+    import utils  # type: ignore
 
-
-class remove_const(argparse.Action):
-
-    def __init__(self,
-                 option_strings,
-                 dest,
-                 const,
-                 default=None,
-                 required=False,
-                 help=None,
-                 metavar=None):
-        super(remove_const, self).__init__(
-            option_strings=option_strings,
-            dest=dest,
-            nargs=0,
-            const=const,
-            default=default,
-            required=required,
-            help=help,
-            metavar=metavar)
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        items = argparse._copy.copy(
-            argparse._ensure_value(namespace, self.dest, [])
-        )
-        try:
-            items.remove(self.const)
-        except ValueError:
-            pass
-        else:
-            setattr(namespace, self.dest, items)
-
-
-def is_development(settings):
-    return settings['DEPLOYMENT_TYPE'] == 'development'
+SECRET_KEY_LENGTH = 50
 
 
 class InstallError(Exception):
     pass
 
 
-def get_password(prompt):
+def get_password(prompt) -> str:
     while True:
         first = getpass(prompt)
         second = getpass('Enter again to confirm: ')
         if first == second:
             break
-        print('Whoops, those don\'t match. Try again.\n')
+        print("Whoops, those don't match. Try again.\n")  # noqa: T201
     return first
+
+
+@dataclass
+class Settings:
+    DEPLOYMENT_TYPE: str
+    DEBUG: bool
+    PROJECT_NAME: str
+    SECRET_KEY: str
+    DATABASE_NAME: str
+    DATABASE_USER: str
+    DATABASE_PASSWORD: str
+    SITE_DOMAIN_NAME: str
+    ADDITIONAL_SETTINGS_FILES: list[str]
+    CONDA_ENV_NAME: str
+    DATABASE_HOST: str | None = None
+    DATABASE_PORT: int | None = None
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        pyfile: str = self.DEPLOYMENT_TYPE + '.py'
+        if not utils.get_settings_file(pyfile).is_file():
+            warnings.warn(
+                f'Could not find settings file for env named {pyfile}',
+                stacklevel=1,
+            )
+
+    @classmethod
+    def from_options(
+        cls: type[Self],
+        *,
+        deployment_type: str,
+        project_name: str,
+        db_name: str | None = None,
+        db_user: str | None = None,
+        db_password: str | None = None,
+        db_host: str | None = None,
+        db_port: str | None = None,
+        domain_name: str,
+        additional_settings_file: list[str] | None = None,
+        env_name: str | None = None,
+        **_,
+    ) -> Self:
+        return cls(
+            DEPLOYMENT_TYPE=deployment_type,
+            DEBUG=(deployment_type == 'development'),
+            PROJECT_NAME=project_name,
+            SECRET_KEY=utils.generate_secret_key(SECRET_KEY_LENGTH),
+            DATABASE_NAME=(db_name if db_name else project_name),
+            DATABASE_USER=(db_user if db_user else project_name),
+            DATABASE_PASSWORD=(
+                db_password
+                if db_password
+                else get_password('Please enter the database user password: ')
+            ),
+            DATABASE_HOST=db_host,
+            DATABASE_PORT=db_port,
+            SITE_DOMAIN_NAME=domain_name,
+            SUBDOMAINS=[],
+            ADDITIONAL_SETTINGS_FILES=(
+                additional_settings_file if additional_settings_file else []
+            ),
+            CONDA_ENV_NAME=(env_name if env_name else project_name),
+        )
 
 
 # this class is a "pseudo-command": it is structured similarly
@@ -86,64 +117,61 @@ def get_password(prompt):
 # has some differences, as it is intended to be run without
 # django installed via a special version of manage.py (in this
 # project as snodas.py).
-class Install(object):
-    help = "Install this snodas project instance to the local system."
+class Install:
+    help = 'Install this snodas project instance to the local system.'
 
     def __init__(self):
         pass
 
-    def default_conf_file(self):
-        return os.path.join(utils.get_project_root(), utils.CONF_FILE_NAME)
+    def default_conf_file(self) -> Path:
+        return utils.CONF_FILE
 
-    def get_version(self):
-        from setup import get_version as gv
-        return gv()
-
-    def create_parser(self, prog_name, subcommand):
+    def create_parser(self, prog_name: str, subcommand: str) -> argparse.ArgumentParser:
         """
         Create and return the ``ArgumentParser`` which will be used to
         parse the arguments to this command.
         """
         parser = argparse.ArgumentParser(
-            prog="{} {}".format(os.path.basename(prog_name), subcommand),
+            prog=f'{Path(prog_name).name} {subcommand}',
             description=self.help,
         )
         self.add_arguments(parser)
         return parser
 
     @classmethod
-    def add_arguments(cls, parser):
+    def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
         # base options
-        parser.add_argument(
-            '--version',
-            action='store_true',
-            help='Display the version of snodas to be installed then exit.',
-        )
         parser.add_argument(
             '-v',
             '--verbosity',
             default=1,
             type=int,
             choices=[0, 1, 2, 3],
-            help=('Verbosity level; 0=minimal output, 1=normal output, '
-                  '2=verbose output, 3=very verbose output'),
+            help=(
+                'Verbosity level; 0=minimal output, 1=normal output, '
+                '2=verbose output, 3=very verbose output'
+            ),
         )
 
         # config options
         parser.add_argument(
             '--no-configure',
             action='store_true',
-            help=('Don\'t write the config file. '
-                  'Will error if no config is present. '
-                  'Use this to reinstall the instance '
-                  'using an existing config.'),
+            help=(
+                "Don't write the config file. "
+                'Will error if no config is present. '
+                'Use this to reinstall the instance '
+                'using an existing config.'
+            ),
         )
         parser.add_argument(
             '--overwrite-conf',
             action='store_true',
-            help=('Overwrite an existing conf file. '
-                  'Default behavior is to fail with an error '
-                  'if a conf file already exists.'),
+            help=(
+                'Overwrite an existing conf file. '
+                'Default behavior is to fail with an error '
+                'if a conf file already exists.'
+            ),
         )
         parser.add_argument(
             '-n',
@@ -170,47 +198,31 @@ class Install(object):
         parser.add_argument(
             '-p',
             '--db-password',
-            help=('Password for the specified DB user. '
-                  'Default is to prompt user for input.'),
+            help=(
+                'Password for the specified DB user. '
+                'Default is to prompt user for input.'
+            ),
         )
         parser.add_argument(
             '--db-host',
-            help=('Hostname of the DB server. '
-                  'Default is None, which means localhost.'),
+            help=('Hostname of the DB server. Default is None, which means localhost.'),
         )
         parser.add_argument(
             '--db-port',
-            help=('Port for the DB server. '
-                  'Default is None, which will use postgres default.'),
-        )
-        parser.add_argument(
-            '-k',
-            '--secret-key',
-            help=('A django-style secret key. '
-                  'Default is to generate a random string of chars.'),
-        )
-        parser.add_argument(
-            '-l',
-            '--secret-key-length',
-            type=int,
-            default=50,
-            help=('The number of chars if generating a secret key. '
-                  'Default is 50 chars.'),
+            help=(
+                'Port for the DB server. '
+                'Default is None, which will use postgres default.'
+            ),
         )
         parser.add_argument(
             '-t',
             '--deployment-type',
             choices=['development', 'testing', 'production'],
             required=True,
-            help=('The deployment type. '
-                  'Should match an deployment-specific settings module.'),
-        )
-        parser.add_argument(
-            '--debug',
-            action='store_true',
-            help=('Enable debug mode. '
-                  'Default is disabled unless deployment type is development. '
-                  'DO NOT use debug in production.'),
+            help=(
+                'The deployment type. '
+                'Should match an deployment-specific settings module.'
+            ),
         )
         parser.add_argument(
             '-a',
@@ -221,17 +233,22 @@ class Install(object):
         parser.add_argument(
             '-o',
             '--output-file',
-            help=('Where to output settings file. '
-                  'Default is a file named "project.conf" '
-                  'in the instance root.'),
+            type=Path,
+            help=(
+                'Where to output settings file. '
+                'Default is a file named "project.conf" '
+                'in the instance root.'
+            ),
         )
 
         # env options
         parser.add_argument(
             '--conda',
             default='conda',
-            help=('The conda executable to use to make the environment. '
-                  'Default is to use whatever conda is on the path.'),
+            help=(
+                'The conda executable to use to make the environment. '
+                'Default is to use whatever conda is on the path.'
+            ),
         )
         parser.add_argument(
             '--env-name',
@@ -241,44 +258,45 @@ class Install(object):
             '--no-env',
             dest='make_env',
             action='store_false',
-            help=('Don\'t make a conda env, '
-                  'just install to the current python. '
-                  'Default is to make a new conda env.'),
+            help=(
+                "Don't make a conda env, "
+                'just install to the current python. '
+                'Default is to make a new conda env.'
+            ),
         )
         parser.add_argument(
             '--no-conda-deps',
             dest='install_conda_req',
             action='store_false',
-            help=('Don\'t use conda to install dependencies '
-                  'from conda-requirements. '
-                  'Default is to install all dependencies.'),
+            help=(
+                "Don't use conda to install dependencies "
+                'from conda-requirements. '
+                'Default is to install all dependencies.'
+            ),
         )
         parser.add_argument(
             '--conda-requirements',
             default='conda-requirements.txt',
-            help=('File listing packages to install with conda. '
-                  'Default is conda-requirements.txt'),
-        )
-        parser.add_argument(
-            '--python-version',
-            help=('Python version to install. Use setuptools version '
-                  'specification, e.g., ==2.7.11 or >=2.7.8. '
-                  'Default is to get version designated in setup.py'),
+            help=(
+                'File listing packages to install with conda. '
+                'Default is conda-requirements.txt'
+            ),
         )
         parser.add_argument(
             '--overwrite-env',
             action='store_true',
-            help=('Force creation of conda env '
-                  '(removing a previously existing '
-                  'environment of the same name).'
-                  'Default is to error if an env '
-                  'already exists of the same name.'),
+            help=(
+                'Force creation of conda env '
+                '(removing a previously existing '
+                'environment of the same name).'
+                'Default is to error if an env '
+                'already exists of the same name.'
+            ),
         )
 
     @classmethod
-    def run_from_argv(cls, argv):
+    def run_from_argv(cls, argv: list[str]) -> None:
         self = cls()
-        self._called_from_command_line = True
         parser = self.create_parser(argv[0], argv[1])
 
         options = parser.parse_args(argv[2:])
@@ -289,7 +307,7 @@ class Install(object):
         self.execute(*args, **cmd_options)
 
     @classmethod
-    def print_help(cls, prog_name, subcommand):
+    def print_help(cls, prog_name: str, subcommand: str) -> None:
         """
         Print the help message for this command, derived from
         ``self.usage()``.
@@ -298,67 +316,8 @@ class Install(object):
         parser = install.create_parser(prog_name, subcommand)
         parser.print_help()
 
-    def extract_settings_from_options(self, options):
-        settings = {}
-
-        settings['DEPLOYMENT_TYPE'] = options.get('deployment_type')
-
-        pyfile = settings['DEPLOYMENT_TYPE'] + '.py'
-        if not os.path.isfile(utils.get_settings_file(pyfile)):
-            warnings.warn(
-                'Could not find settings file for env named {}'
-                .format(pyfile),
-           )
-
-        settings['DEBUG'] = (
-            is_development(settings) or options.get('debug')
-        )
-
-        settings['PROJECT_NAME'] = options['project_name']
-
-        settings['SECRET_KEY'] = utils.get_default(
-            options,
-            'secret_key',
-            utils.generate_secret_key(options.get('secret_key_length'))
-        )
-
-        settings['DATABASE_NAME'] = utils.get_default(
-            options,
-            'db_name',
-            settings['PROJECT_NAME'],
-        )
-        settings['DATABASE_USER'] = utils.get_default(
-            options,
-            'db_user',
-            settings['DATABASE_NAME'],
-        )
-        settings['DATABASE_PASSWORD'] = utils.get_default(
-            options,
-            'db_password',
-            get_password('Please enter the database user password: '),
-        )
-        settings['DATABASE_HOST'] = utils.get_default(options, 'db_host', None)
-        settings['DATABASE_PORT'] = utils.get_default(options, 'db_port', None)
-
-        settings['SITE_DOMAIN_NAME'] = options['domain_name']
-        settings['SUBDOMAINS'] = []
-
-        settings['ADDITIONAL_SETTINGS_FILES'] = utils.get_default(
-            options,
-            'additional_settings_file',
-            [],
-        )
-
-        settings['CONDA_ENV_NAME'] = utils.get_default(
-            options,
-            'env_name',
-            settings['PROJECT_NAME'],
-        )
-
-        return settings
-
     def write_conf_file(self):
-        with open(self.output_file, 'w') as f:
+        with self.output_file.open('w') as f:
             f.write('# This file contains SECRET information!\n')
             f.write('# Keep the contents of the file private,\n')
             f.write('# especially for production instances.\n')
@@ -367,34 +326,43 @@ class Install(object):
 
         self.vprint(
             2,
-            'Wrote project conf to config file {}'.format(self.output_file)
+            f'Wrote project conf to config file {self.output_file}',
         )
 
-    def create_conda_env(self, options):
+    @staticmethod
+    def get_python_version() -> str:
+        import tomllib
+
+        from pathlib import Path
+
+        pyproject = tomllib.loads(
+            (Path(utils.get_project_root()) / 'pyproject.toml').read_text(),
+        )
+        return pyproject['project']['requires-python']
+
+    def create_conda_env(self, options) -> None:
         import json
 
-        # if we've gotten here then this class should have
-        # been called from the snodas manage.py, which has
-        # added the root project directory to the path,
-        # and setup.py should be importable
-        from setup import PYTHON_REQUIREMENTS
+        python_requirements = self.get_python_version()
 
-        conda = options.get('conda')
+        conda: str = options['conda']
 
         conda_info = json.loads(
-                subprocess.run(
-                    [conda, 'info', '--json'],
-                    check=True,
-                    capture_output=True,
-                ).stdout
-            )
-
-        name = self.settings['CONDA_ENV_NAME']
+            subprocess.run(
+                [conda, 'info', '--json'],  # noqa: S603
+                check=True,
+                capture_output=True,
+            ).stdout,
+        )
 
         # build the env create command
-        install_cmd = [
-            conda, 'create', '-y', '-n', name,
-            'python{}'.format(PYTHON_REQUIREMENTS),
+        install_cmd: list[str] = [
+            conda,
+            'create',
+            '-y',
+            '-n',
+            self.settings.CONDA_ENV_NAME,
+            f'python{python_requirements}',
         ]
 
         if options.get('overwrite_env'):
@@ -405,109 +373,126 @@ class Install(object):
 
         # if overwrite_env isn't set to replace an existing env,
         # then we want to check for the env and fail if exists
-        if not options.get('overwrite_env'):
-            if name in \
-                    [os.path.basename(env) for env in conda_info['envs']]:
-                raise InstallError(
-                    'A conda env of name '
-                    '{} already exists.'.format(name)
-                )
+        if not options.get('overwrite_env') and self.settings.CONDA_ENV_NAME in [
+            Path(env).name for env in conda_info['envs']
+        ]:
+            raise InstallError(
+                'A conda env of name '
+                f'{self.settings.CONDA_ENV_NAME} already exists.',
+            )
 
         self.vprint(
             2,
-            'creating conda env with the following command:'
-            '{}'.format(install_cmd)
+            'creating conda env with the following command:' f'{install_cmd}',
         )
 
         # now we create the env
-        subprocess.run(install_cmd, check=True)
-        self.env_root = os.path.join(conda_info['sys.prefix'], 'envs', name)
-
-        self.vprint(1, 'conda env created at {}'.format(self.env_root))
-
-    def install(self, options):
-        pip = self.get_pip()
-
-        cmd = [
-            pip, 'install', '-e', utils.get_project_root(),
-        ]
-
-        self.vprint(
-            2,
-            'Processing the following command for install:\n'
-            '{}'.format(cmd)
+        subprocess.run(install_cmd, check=True)  # noqa: S603
+        self.env_root: Path = (
+            Path(conda_info['sys.prefix']) / 'envs' / self.settings.CONDA_ENV_NAME
         )
 
-        subprocess.run(cmd, check=True)
+        self.vprint(1, f'conda env created at {self.env_root}')
 
-    def get_pip(self):
+    def install(self) -> None:
+        pip = self.get_pip()
+
+        # install deps
+        cmd: list[str] = [
+            pip,
+            'install',
+            '-r',
+            str(utils.PROJECT_ROOT / 'requirements.txt'),
+        ]
+        self.vprint(
+            2,
+            'Processing the following command for install:\n' f'{cmd}',
+        )
+        subprocess.run(cmd, check=True)  # noqa: S603
+
+        # install app
+        cmd = [
+            pip,
+            'install',
+            '-e',
+            str(utils.PROJECT_ROOT),
+        ]
+        self.vprint(
+            2,
+            'Processing the following command for install:\n' f'{cmd}',
+        )
+        subprocess.run(cmd, check=True)  # noqa: S603
+
+    def get_pip(self) -> str:
         if hasattr(self, 'env_root'):
-            return os.path.join(self.env_root, 'Scripts', 'pip.exe')
-        else:
-            return 'pip'
+            return str(self.env_root / 'Scripts' / 'pip.exe')
+        return 'pip'
 
-    def print_conf(self):
-        if self.verbosity < 2:
+    def print_conf(self) -> None:
+        if self.verbosity and self.verbosity < 2:
             return
-        print('Using the following configuration settings:', flush=True)
-        for key, val in sorted(self.settings.items()):
-            print("    {} = {}".format(key, val), flush=True)
+        print('Using the following configuration settings:', flush=True)  # noqa: T201
+        for key, val in sorted(self.settings.__dict__.items()):
+            if 'secret' in key.lower() or 'password' in key.lower():
+                val = '************'
+            print(f'    {key} = {val}', flush=True)  # noqa: T201
 
-    def vprint(self, level, *args, **kwargs):
+    def vprint(self, level, *args, **kwargs) -> None:
         kwargs['flush'] = True
         if self.verbosity >= level:
-            print(*args, **kwargs)
+            print(*args, **kwargs)  # noqa: T201
 
-    def snodas_command_error(self):
-        project_root = utils.get_project_root()
-        project_root_message = ''
-        if project_root != os.getcwd():
-            project_root_message = \
-                ' from the project\'s root directory {}'.format(project_root)
+    def snodas_command_error(self) -> None:
+        project_root = utils.PROJECT_ROOT
+        project_root_message = (
+            ''
+            if project_root == Path.cwd()
+            else f" from the project's root directory {project_root}"
+        )
 
-        print(
-            ('Unfortunately, the install command must be run '
-             'using the project\'s manage.py script instead of '
-             'the snodas command. Try running `python manage.py install`{}.'
-            ).format(project_root_message),
+        print(  # noqa: T201
+            'Unfortunately, the install command must be run '
+            "using the project's manage.py script instead of "
+            'the snodas command. Try running '
+            f'`python manage.py install`{project_root_message}.',
             flush=True,
         )
 
-    def execute(self, *args, **options):
-        if os.path.basename(sys.argv[0]) == 'snodas':
+    def execute(self, *_, **options) -> int:
+        if Path(sys.argv[0]).name == 'snodas':
             self.snodas_command_error()
             return 1
 
-        if options.get('version'):
-            print('snodas version {}'.format(self.get_version()), flush=True)
-            return 2
+        self.verbosity: int = options['verbosity']
 
-        self.verbosity = options.get('verbosity')
-
-        self.output_file = utils.get_default(
+        self.output_file: Path = utils.get_default(
             options,
             'output_file',
             self.default_conf_file(),
         )
 
-        self.vprint(2, 'Config file path will be {}'.format(self.output_file))
+        self.vprint(2, f'Config file path will be {self.output_file}')
 
-        conf_exists = os.path.isfile(self.output_file)
+        conf_exists: bool = self.output_file.exists()
 
-        if options.get('no_configure') and conf_exists:
-            self.vprint(1,'Reusing existing configuration from {}'.format(self.output_file))
-            self.settings = utils.load_conf_file(self.output_file)
-        elif options.get('no_configure') and not conf_exists:
-            print('ERROR: no-configure option specified '
-                  'but configuration file does not exist.')
+        if options['no_configure'] and conf_exists:
+            self.vprint(1, f'Reusing existing configuration from {self.output_file}')
+            self.settings = Settings(**utils.load_conf_file(self.output_file))
+        elif options['no_configure'] and not conf_exists:
+            print(  # noqa: T201
+                'ERROR: no-configure option specified '
+                'but configuration file does not exist.',
+            )
             return 3
-        elif conf_exists and not options.get('overwrite_conf'):
-            print('ERROR: configuration file already exists '
-                  'and overwrite-conf option not specified.')
+        elif conf_exists and not options['overwrite_conf']:
+            print(  # noqa: T201
+                'ERROR: configuration file already exists '
+                'and overwrite-conf option not specified.',
+            )
             return 4
         else:
             self.vprint(1, 'Generating configuration from install options')
-            self.settings = self.extract_settings_from_options(options)
+            self.settings = Settings.from_options(**options)
 
         self.print_conf()
 
@@ -517,12 +502,11 @@ class Install(object):
         else:
             self.vprint(
                 1,
-                'conda env creation skipped; '
-                'installing to active python instance',
+                'conda env creation skipped; ' 'installing to active python instance',
             )
 
         self.vprint(1, 'Installing project')
-        self.install(options)
+        self.install()
 
         if not options.get('no_configure'):
             self.write_conf_file()
@@ -531,18 +515,19 @@ class Install(object):
         self.vprint(1, '\nInstallation successful!')
         self.vprint(
             1,
-            ('\nNext, activate the new conda env for the project:\n\n'
-             '`conda activate {}`\n\n'
-             'Then, setup any required services for this instance:\n\n'
-             '`snodas createdb [options]  # creates a postgres DB`\n'
-             '`snodas setupiis [options]  # creates a site in IIS`\n\n'
-             'Once the services are configured, '
-             'you can run a webserver:\n\n'
-             '`snodas runserver [options]'
-             'To learn what options apply to each command, try:\n\n'
-             '`snodas help <command>`'
-             ).format(self.settings['PROJECT_NAME'])
+            '\nNext, activate the new conda env for the project:\n\n'
+            f'`conda activate {self.settings.PROJECT_NAME}`\n\n'
+            'Then, setup any required services for this instance:\n\n'
+            '`snodas createdb [options]  # creates a postgres DB`\n'
+            '`snodas setupiis [options]  # creates a site in IIS`\n\n'
+            'Once the services are configured, '
+            'you can run a webserver:\n\n'
+            '`snodas runserver [options]'
+            'To learn what options apply to each command, try:\n\n'
+            '`snodas help <command>`',
         )
+
+        return 0
 
 
 # Unlike the Install class above, this is actually a django command.
@@ -550,44 +535,47 @@ class Install(object):
 # the install command into the manage.py command display, for the
 # sake of a consistent user experience/documentation. It is never
 # intended to be executed, and it will raise an error if attempted.
-class Command(BaseCommand):
-    help = Install.help
+if BaseCommand:
 
-    requires_system_checks = []
+    class Command(BaseCommand):
+        help = Install.help
 
-    def create_parser(self, prog_name, subcommand):
-        """
-        Create and return the ``ArgumentParser`` which will be used to
-        parse the arguments to this command. We use the default definition
-        from the django source, but we drop all the options because we
-        don't want to display options that are not supported.
-        """
-        parser = CommandParser(
-            self, prog="%s %s" % (os.path.basename(prog_name), subcommand),
-            description=Install.help or None,
-        )
-        self.add_arguments(parser)
-        return parser
+        requires_system_checks = []  # type: ignore  # noqa: RUF012
 
-    def add_arguments(self, parser):
-        Install.add_arguments(parser)
+        def create_parser(self, prog_name, subcommand):
+            """
+            Create and return the ``ArgumentParser`` which will be used to
+            parse the arguments to this command. We use the default definition
+            from the django source, but we drop all the options because we
+            don't want to display options that are not supported.
+            """
+            parser = CommandParser(
+                prog=f'{Path(prog_name).name} {subcommand}',
+                description=Install.help or None,
+            )
+            self.add_arguments(parser)
+            return parser
 
-    def print_help(self, prog_name, subcommand):
-        """
-        Print the help message for this command, derived from
-        ``self.usage()``.
-        """
-        if prog_name == 'snodas':
-            prog_name = 'manage.py'
-            print(
-                '\n**PLEASE NOTE: the install command must be run '
-                'using the project\'s manage.py script instead of '
-                'the snodas command.**\n')
-        super(Command, self).print_help(prog_name, subcommand)
+        def add_arguments(self, parser):
+            Install.add_arguments(parser)
 
-    def handle(self, *args, **options):
-        raise CommandError(
-            'If you got here then you are not running the snodas '
-            'manage.py script for your commands. Do not call '
-            'install from django-admin.'
-        )
+        def print_help(self, prog_name, subcommand):
+            """
+            Print the help message for this command, derived from
+            ``self.usage()``.
+            """
+            if prog_name == 'snodas':
+                prog_name = 'manage.py'
+                print(  # noqa: T201
+                    '\n**PLEASE NOTE: the install command must be run '
+                    "using the project's manage.py script instead of "
+                    'the snodas command.**\n',
+                )
+            super().print_help(prog_name, subcommand)
+
+        def handle(self, *_, **__):
+            raise CommandError(
+                'If you got here then you are not running the snodas '
+                'manage.py script for your commands. Do not call '
+                'install from django-admin.',
+            )

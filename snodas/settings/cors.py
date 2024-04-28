@@ -2,7 +2,7 @@
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
 # https://github.com/ottoyiu/django-cors-headers
 
-INSTALLED_APPS += ('corsheaders', )
+INSTALLED_APPS += ('corsheaders',)
 
 CORS_ALLOWED_ORIGINS = (
     'https://ebagis.geog.pdx.edu',
@@ -18,6 +18,6 @@ CORS_URLS_REGEX = r'.*'
 
 # we can also allow cookies, but this is a security risk
 # and doesn't seem to be necessary
-#CORS_ALLOW_CREDENTIALS = True
+# CORS_ALLOW_CREDENTIALS = True
 
-MIDDLEWARE = ('corsheaders.middleware.CorsMiddleware', ) + MIDDLEWARE
+MIDDLEWARE = ('corsheaders.middleware.CorsMiddleware',) + MIDDLEWARE

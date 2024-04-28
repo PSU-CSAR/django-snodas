@@ -1,57 +1,101 @@
 import logging
 
-from django.db import connection
-from django.http import HttpResponse
+from typing import assert_never
 
+from django.db import connection
+from django.http import Http404
+
+from snodas import types
 
 logger = logging.getLogger(__name__)
 
 
-def get_points(request):
-    if request.method != 'GET':
-        return HttpResponse(reason="Not allowed", status=405)
-
-    query = '''SELECT jsonb_build_object(
-  'type', 'FeatureCollection',
-  'features', jsonb_agg(features.feature)
-)::text
-FROM (
-  SELECT jsonb_build_object(
-    'type', 'Feature',
-    'id', pourpoint_id,
-    'geometry', ST_AsGeoJSON(point, 6)::jsonb,
-    'properties', to_jsonb(inputs) - 'gid' - 'point'
-  ) AS feature
-  FROM (
-    SELECT
-      pourpoint_id,
-      name,
-      awdb_id,
-      source,
-      point,
-      area_meters
-    FROM pourpoint.pourpoint
-  ) inputs
-) features'''
+def get_points() -> types.PourPoints:
+    query = """
+        SELECT jsonb_build_object(
+            'type', 'Feature',
+            'id', pourpoint_id,
+            'geometry', ST_AsGeoJSON(point, 6)::jsonb,
+            'properties', to_jsonb(inputs) - 'gid' - 'point' - 'pourpoint_id'
+        ) AS feature
+        FROM (
+            SELECT
+                pourpoint_id,
+                name,
+                awdb_id as station_triplet,
+                point,
+                area_meters,
+                polygon is not null as has_polygon
+            FROM pourpoint.pourpoint
+            ORDER BY pourpoint_id
+        ) inputs
+    """
 
     with connection.cursor() as cursor:
         cursor.execute(query)
-        rows = cursor.fetchone()
-
-    if not rows:
-        return HttpResponse(status=204)
-
-    return HttpResponse(
-        rows[0],
-        content_type='application/vnd.geo+json',
-    )
+        return types.PourPoints(
+            features=[
+                types.PourPoint.model_validate_json(feat[0])
+                for feat in cursor.fetchall()
+            ],
+        )
 
 
-def get_tile(request, zoom, x, y):
-    if request.method != 'GET':
-        return HttpResponse(reason="Not allowed", status=405)
+def get_point(pourpoint_ref: int | str) -> types.PourPoint:
+    match pourpoint_ref:
+        case int():
+            query = """
+                SELECT jsonb_build_object(
+                    'type', 'Feature',
+                    'id', pourpoint_id,
+                    'geometry', ST_AsGeoJSON(point, 6)::jsonb,
+                    'properties', to_jsonb(inputs) - 'gid' - 'point' - 'pourpoint_id'
+                ) AS feature
+                FROM (
+                    SELECT
+                        pourpoint_id,
+                        name,
+                        awdb_id as station_triplet,
+                        point,
+                        area_meters
+                    FROM pourpoint.pourpoint
+                    WHERE pourpoint_id = %s
+                ) inputs
+            """
+        case str():
+            query = """
+                SELECT jsonb_build_object(
+                    'type', 'Feature',
+                    'id', pourpoint_id,
+                    'geometry', ST_AsGeoJSON(point, 6)::jsonb,
+                    'properties', to_jsonb(inputs) - 'gid' - 'point' - 'pourpoint_id'
+                ) AS feature
+                FROM (
+                    SELECT
+                        pourpoint_id,
+                        name,
+                        awdb_id as station_triplet,
+                        point,
+                        area_meters
+                    FROM pourpoint.pourpoint
+                    WHERE awdb_id = %s
+                ) inputs
+            """
+        case _ as unreachable:
+            assert_never(unreachable)
 
-    query = 'SELECT pourpoint.get_tile(%s, %s, %s);'
+    with connection.cursor() as cursor:
+        cursor.execute(query, [pourpoint_ref])
+        row = cursor.fetchone()
+
+        if not row:
+            raise Http404()
+
+        return types.PourPoint.model_validate_json(row[0])
+
+
+def get_tile(zoom: types.Zoom, x: int, y: int) -> bytes:
+    query: str = 'SELECT pourpoint.get_tile(%s, %s, %s);'
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -60,10 +104,7 @@ def get_tile(request, zoom, x, y):
         )
         tile = cursor.fetchone()
 
-    if not tile:
-        return HttpResponse(status=404)
+    if not (tile and tile[0]):
+        raise Http404()
 
-    return HttpResponse(
-        bytes(tile[0]),
-        content_type='application/vnd.mapbox-vector-tile',
-    )
+    return bytes(tile[0])
