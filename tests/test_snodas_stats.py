@@ -164,7 +164,8 @@ class ConstantSNODASTestCase(TestCase):
             raster_data = cursor.fetchone()[0]
             cursor.execute(
                 snodas_sql,
-                [raster_data] * 8 + [
+                [raster_data] * 8
+                + [
                     datetime.strptime('20180502', '%Y%m%d').astimezone(UTC),
                 ],
             )
@@ -177,7 +178,8 @@ class ConstantSNODASTestCase(TestCase):
             raster_data = cursor.fetchone()[0]
             cursor.execute(
                 snodas_sql,
-                [raster_data] * 8 + [
+                [raster_data] * 8
+                + [
                     datetime.strptime('20180501', '%Y%m%d').astimezone(UTC),
                 ],
             )

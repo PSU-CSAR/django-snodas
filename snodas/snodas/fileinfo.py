@@ -21,7 +21,7 @@ class Datatype(StrEnum):
 
 
 class Timecode(StrEnum):
-    T0024 =  '0024'  # 24 hr integration
+    T0024 = '0024'  # 24 hr integration
     T0001 = '0001'  # 1 hr snapshot
 
 

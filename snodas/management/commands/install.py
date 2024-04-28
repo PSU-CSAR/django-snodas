@@ -105,9 +105,7 @@ class Settings:
             SITE_DOMAIN_NAME=domain_name,
             SUBDOMAINS=[],
             ADDITIONAL_SETTINGS_FILES=(
-                additional_settings_file
-                if additional_settings_file
-                else []
+                additional_settings_file if additional_settings_file else []
             ),
             CONDA_ENV_NAME=(env_name if env_name else project_name),
         )
@@ -207,9 +205,7 @@ class Install:
         )
         parser.add_argument(
             '--db-host',
-            help=(
-                'Hostname of the DB server. Default is None, which means localhost.'
-            ),
+            help=('Hostname of the DB server. Default is None, which means localhost.'),
         )
         parser.add_argument(
             '--db-port',
@@ -359,7 +355,6 @@ class Install:
             ).stdout,
         )
 
-
         # build the env create command
         install_cmd: list[str] = [
             conda,
@@ -378,11 +373,9 @@ class Install:
 
         # if overwrite_env isn't set to replace an existing env,
         # then we want to check for the env and fail if exists
-        if (
-            not options.get('overwrite_env')
-            and self.settings.CONDA_ENV_NAME
-            in [Path(env).name for env in conda_info['envs']]
-        ):
+        if not options.get('overwrite_env') and self.settings.CONDA_ENV_NAME in [
+            Path(env).name for env in conda_info['envs']
+        ]:
             raise InstallError(
                 'A conda env of name '
                 f'{self.settings.CONDA_ENV_NAME} already exists.',
@@ -396,9 +389,7 @@ class Install:
         # now we create the env
         subprocess.run(install_cmd, check=True)  # noqa: S603
         self.env_root: Path = (
-            Path(conda_info['sys.prefix'])
-            / 'envs'
-            / self.settings.CONDA_ENV_NAME
+            Path(conda_info['sys.prefix']) / 'envs' / self.settings.CONDA_ENV_NAME
         )
 
         self.vprint(1, f'conda env created at {self.env_root}')
@@ -543,6 +534,7 @@ class Install:
 # sake of a consistent user experience/documentation. It is never
 # intended to be executed, and it will raise an error if attempted.
 if BaseCommand:
+
     class Command(BaseCommand):
         help = Install.help
 

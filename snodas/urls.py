@@ -74,6 +74,7 @@ def tiles_list_dates(
 ):
     return tiles.list_dates()
 
+
 @api.get(
     '/tiles/{date}/{zoom}/{x}/{y}.png',
     include_in_schema=settings.DEBUG,
@@ -147,7 +148,10 @@ def get_pourpoint_by_triplet(
 ):
     response['Content-Type'] = 'application/geo+json'
     return pourpoints.get_point(station_triplet).build_links(
-        request, api, full=True, from_triplet=True,
+        request,
+        api,
+        full=True,
+        from_triplet=True,
     )
 
 

@@ -14,8 +14,6 @@ import sqlparse
 from django.core.management.base import BaseCommand, CommandError
 from django.db import DEFAULT_DB_ALIAS, connections, transaction
 
-from snodas.management import utils
-
 bz2: ModuleType | None = None
 with contextlib.suppress(ImportError):
     import bz2

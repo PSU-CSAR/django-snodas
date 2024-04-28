@@ -34,10 +34,14 @@ class SnodasVariable(StrEnum):
 
 
 def to_date(value: str) -> date:
-    return datetime.strptime(
-        value.replace('-', ''),
-        '%Y%m%d',
-    ).astimezone(UTC).date()
+    return (
+        datetime.strptime(
+            value.replace('-', ''),
+            '%Y%m%d',
+        )
+        .astimezone(UTC)
+        .date()
+    )
 
 
 Date = Annotated[

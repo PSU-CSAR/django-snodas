@@ -215,8 +215,5 @@ class _QueriesFactory:
 
 
 locals().update(
-    {
-        f.stem: _QueriesFactory.load(f)
-        for f in _Path(__file__).parent.glob('*.sql')
-    },
+    {f.stem: _QueriesFactory.load(f) for f in _Path(__file__).parent.glob('*.sql')},
 )
