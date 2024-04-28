@@ -19,9 +19,8 @@ def stream_file(filelike, filename, request, content_type):
             start, end = re.findall(r'/d+', request.META['HTTP_RANGE'])
         except TypeError:
             logger.exception(
-                'Malformed HTTP_RANGE in download request: {}'.format(
-                    request.META['HTTP_RANGE'],
-                ),
+                'Malformed HTTP_RANGE in download request: %s',
+                request.META['HTTP_RANGE'],
             )
             return HttpResponse(
                 status=416,

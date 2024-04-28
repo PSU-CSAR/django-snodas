@@ -5,7 +5,7 @@ from django.db import connection
 from django.http import HttpResponse
 
 from snodas import types
-from snodas.queries import streamflow
+from snodas.queries import streamflow  # type: ignore
 from snodas.utils.http import stream_file
 
 
@@ -130,7 +130,10 @@ def streamflow_regression(
         value_columns=value_columns,
     )
 
-    name = f'streamflow_{variable}_{forecast_start}-{forecast_end}_{month}-{day}_{start_year}-{end_year}.csv'
+    name = (
+        f'streamflow_{variable}_{forecast_start}'
+        f'-{forecast_end}_{month}-{day}_{start_year}-{end_year}.csv'
+    )
 
     with connection.cursor() as cursor:
         return raw_stat_query_csv(request, cursor, name, query)

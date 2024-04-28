@@ -38,11 +38,11 @@ for string interpolation), and can contain:
       there is overlap, the identifier must end with '_i'.
 """
 
-import os as _os
 import re as _re
 
-from glob import glob as _glob
-from types import ModuleType as _MT
+from dataclasses import dataclass as _dataclass
+from pathlib import Path as _Path
+from types import ModuleType as _ModuleType
 
 from psycopg2.sql import (
     SQL as _SQL,
@@ -57,6 +57,15 @@ from psycopg2.sql import (
 # TODO: I think this might be refined if I used a custom
 #       loader rather than the hacks below. Not sure.
 #       https://docs.python.org/3/glossary.html#term-loader
+
+
+@_dataclass
+class _Parsed:
+    name: str
+    params: set[str]
+    ids: set[str]
+    raws: set[str]
+    docstr: str = ''
 
 
 class ParseError(ValueError):
@@ -78,25 +87,29 @@ class _QueriesFactory:
     def __init__(self, queries=None):
         if queries:
             for query in queries:
-                self.add(*query)
+                self._add(*query)
 
     @staticmethod
-    def _add(self, name, ids, params, raws, docstr, sql):
-        if name in self.__dict__:
-            raise ParseError(f"Duplicate query name: '{name}'")
+    def _add(thing, meta: _Parsed, sql) -> None:
+        if meta.name in thing.__dict__:
+            raise ParseError(f"Duplicate query name: '{meta.name}'")
 
-        args = ', '.join(params.union(ids).union(raws))
-        idstring = ', '.join([f'{i}_i=Ident({i})' for i in ids.intersection(params)])
-        idstring += ', '.join([f'{i}=Ident({i})' for i in ids.difference(params)])
-        rawstring = ', '.join([f'{r}=Raw(str({r}))' for r in raws])
-        paramstring = ', '.join([f'{p}=Lit({p})' for p in params])
+        args = ', '.join(meta.params.union(meta.ids).union(meta.raws))
+        idstring = ', '.join(
+            [f'{i}_i=Ident({i})' for i in meta.ids.intersection(meta.params)],
+        )
+        idstring += ', '.join(
+            [f'{i}=Ident({i})' for i in meta.ids.difference(meta.params)],
+        )
+        rawstring = ', '.join([f'{r}=Raw(str({r}))' for r in meta.raws])
+        paramstring = ', '.join([f'{p}=Lit({p})' for p in meta.params])
         func = 'def {name}({args}):\n    return sql.format({kwargs})\n'.format(
-            name=name,
+            name=meta.name,
             args=args,
             kwargs=', '.join(filter(bool, [idstring, paramstring, rawstring])),
         )
         code = compile(func, '<string>', 'exec')
-        eval(
+        eval(  # noqa: S307
             code,
             {
                 'sql': sql,
@@ -104,28 +117,27 @@ class _QueriesFactory:
                 'Ident': _Identifier,
                 'Raw': _SQL,
             },
-            self.__dict__,
+            thing.__dict__,
         )
-        self.__dict__[name].__doc__ = docstr
+        thing.__dict__[meta.name].__doc__ = meta.docstr
 
     @classmethod
     def parse(cls, module, text, filepath=None):
         doc = cls._topdoc_re.match(text)
-        queries = _MT(module, doc=(doc.group(1) if doc else None))
+        queries = _ModuleType(module, doc=(doc.group(1) if doc else None))
         _qs = cls._query_re.findall(text)
         if filepath:
             queries.__file__ = filepath
         for meta, sql in _qs:
-            name, ids, params, raws, docstr = cls._extract_meta(meta)
-            cls._add(queries, name, ids, params, raws, docstr, _SQL(sql))
+            cls._add(queries, cls._extract_meta(meta), _SQL(sql))
         return queries
 
     @classmethod
-    def _extract_meta(cls, meta_text):
-        names = []
-        params = set()
-        ids = set()
-        raws = set()
+    def _extract_meta(cls, meta_text: str) -> _Parsed:  # noqa: C901
+        names: list[str] = []
+        params: set[str] = set()
+        ids: set[str] = set()
+        raws: set[str] = set()
         docstr = ''
 
         for line in meta_text.split('\n'):
@@ -162,7 +174,7 @@ class _QueriesFactory:
                 raw = is_raw.group(1)
                 if raw in raws:
                     raise ParseError(
-                        f"Query identifier specified more than once: '{_id}'",
+                        f"Query raw identifier specified more than once: '{raw}'",
                     )
                 raws.add(raw)
                 continue
@@ -175,18 +187,27 @@ class _QueriesFactory:
             raise ParseError(
                 f"Query cannot have more than one name. Found '{names}'",
             )
-        elif len(names) < 1:
+
+        if len(names) < 1:
             raise ParseError(
                 'Unnamed query cannot be processed',
             )
 
-        return names[0], ids, params, raws, docstr
+        return _Parsed(
+            name=names[0],
+            ids=ids,
+            params=params,
+            raws=raws,
+            docstr=docstr,
+        )
 
     @classmethod
-    def load(cls, query_file):
-        name = _os.path.splitext(_os.path.basename(query_file))[0]
-        with open(query_file) as f:
-            return cls.parse(name, f.read(), filepath=query_file)
+    def load(cls, query_file: _Path):
+        return cls.parse(
+            query_file.stem,
+            query_file.read_text(),
+            filepath=str(query_file),
+        )
 
     @staticmethod
     def static():
@@ -195,9 +216,7 @@ class _QueriesFactory:
 
 locals().update(
     {
-        _os.path.splitext(_os.path.basename(f))[0]: _QueriesFactory.load(f)
-        for f in _glob(
-            _os.path.join(_os.path.dirname(__file__), '*.sql'), recursive=False,
-        )
+        f.stem: _QueriesFactory.load(f)
+        for f in _Path(__file__).parent.glob('*.sql')
     },
 )
