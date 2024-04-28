@@ -1,9 +1,8 @@
-import json
 import logging
-from typing import Literal
+
+from datetime import date
 
 from django.db import connection
-from django.http import HttpResponse
 
 from snodas import types
 
@@ -22,72 +21,21 @@ EMPTY_PNG = (
 )
 
 
-def list_dates(request):
-    if request.method != 'GET':
-        return HttpResponse(reason='Not allowed', status=405)
+DateList = list[date]
 
+
+def list_dates() -> DateList:
     with connection.cursor() as cursor:
         cursor.execute('SELECT date FROM snodas.raster ORDER BY date DESC')
-        dates = [str(date[0]) for date in cursor.fetchall()]
-
-    return HttpResponse(json.dumps(dates), content_type='application/json')
-
-
-# TODO: clean this up because it did not help anything
-def date_params(request):
-    if request.method != 'GET':
-        return HttpResponse(reason='Not allowed', status=405)
-
-    query = """WITH start_end as (
-  SELECT
-    MIN(date) as start_date,
-    MAX(date) as end_date
-  FROM
-    snodas.raster
-)
-SELECT row_to_json(t)::text
-FROM (
-  SELECT
-    (SELECT start_end.start_date::text as start_date FROM start_end),
-    (SELECT start_end.end_date::text as end_date FROM start_end),
-    json_agg(missing::date::text) as missing
-  FROM
-    generate_series(
-      (SELECT start_date FROM start_end),
-      (SELECT end_date FROM start_end),
-      interval '1 day'
-    ) AS missing
-  WHERE
-    missing NOT IN (SELECT date FROM snodas.raster)
-) as t"""
-
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-        dates = cursor.fetchone()
-
-    return HttpResponse(dates, content_type='application/json')
+        return [date[0] for date in cursor.fetchall()]
 
 
 def get_tile(
-    request,
     date: types.Date,
     zoom: types.Zoom,
     x: int,
     y: int,
-    format: Literal['png', 'jpg', 'jpeg'],
-):
-    if request.method != 'GET':
-        return HttpResponse(reason='Not allowed', status=405)
-
-    # TODO: actually handle jpeg format tiles
-    if format == 'jpg':
-        format = 'jpeg'
-
-    # TODO: ability to pass options into the output raster creation
-    # e.g., compression or quality settings
-    options = "ARRAY['']"
-
-    # TODO: option for resample true/false (currently always false)
+) -> bytes:
     query = 'SELECT snodas.tile2png((%s, %s, %s)::tms_tilecoordz, %s::date, true)'
 
     with connection.cursor() as cursor:
@@ -97,12 +45,8 @@ def get_tile(
         )
         row = cursor.fetchone()
 
-    if not row or not row[0]:
-        png = EMPTY_PNG
-    else:
+    png: bytes = EMPTY_PNG
+    if row and row[0]:
         png = row[0]
 
-    return HttpResponse(
-        bytes(png),
-        content_type=f'application/{format.lower}',
-    )
+    return png

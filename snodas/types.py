@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum, auto
 from typing import Annotated, Literal, Protocol, Self
 
@@ -37,7 +37,7 @@ def to_date(value: str) -> date:
     return datetime.strptime(
         value.replace('-', ''),
         '%Y%m%d',
-    ).date()
+    ).astimezone(UTC).date()
 
 
 Date = Annotated[
@@ -61,7 +61,6 @@ StationTriplet = Annotated[
     ),
     WithJsonSchema(
         {
-            #'pattern': f'^{STATION_TRIPLET}$',
             'example': '12354500:MT:USGS',
         },
         mode='validation',
@@ -183,7 +182,7 @@ class PourPoint(BaseModel):
                         ),
                         title='Query AOI statistics by day of year',
                     ),
-                ]
+                ],
             )
 
         if full:
@@ -198,7 +197,7 @@ class PourPoint(BaseModel):
                             ),
                         ),
                     ),
-                ]
+                ],
             )
 
         return self
@@ -277,11 +276,10 @@ class DateRangeQuery(BaseModel):
         """
 
         daterange = f'[{self.start_date}, {self.end_date}]'
-        query = sql.SQL(base_query).format(
+        return sql.SQL(base_query).format(
             sql.Literal(pourpoint_id),
             sql.Literal(daterange),
         )
-        return query
 
     def csv_name(self, pourpoint_name: str) -> str:
         return '{}_{}-{}.csv'.format(
@@ -325,13 +323,12 @@ class DOYQuery(BaseModel):
         """
 
         year_range = f'[{self.start_year}, {self.end_year}]'
-        query = sql.SQL(base_query).format(
+        return sql.SQL(base_query).format(
             sql.Literal(pourpoint_id),
             sql.Literal(year_range),
             sql.Literal(self.month),
             sql.Literal(self.day),
         )
-        return query
 
     def csv_name(self, pourpoint_name: str) -> str:
         return '{}_{}-{}_{}-{}.csv'.format(
@@ -369,8 +366,8 @@ class PourPointStats(BaseModel):
                     'precip_solid': 6.18786387077508,
                     'precip_liquid': 0.03673017090738538,
                     'sublimation_blowing': -6.307803776158206e-8,
-                }
-            ]
+                },
+            ],
         ],
     )
     links: list[Link] = []

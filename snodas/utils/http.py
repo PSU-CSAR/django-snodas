@@ -20,7 +20,7 @@ def stream_file(filelike, filename, request, content_type):
         except TypeError:
             logger.exception(
                 'Malformed HTTP_RANGE in download request: {}'.format(
-                    request.META['HTTP_RANGE']
+                    request.META['HTTP_RANGE'],
                 ),
             )
             return HttpResponse(

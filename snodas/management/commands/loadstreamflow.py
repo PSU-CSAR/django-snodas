@@ -1,36 +1,15 @@
 # based in part on the loaddata command from django
 # some of the code falls under that django copyright
 import datetime
-import gzip
 import json
-import os
-import sys
+
 from pprint import pprint
-from zipfile import ZipFile
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import DEFAULT_DB_ALIAS, connections, transaction
 from psycopg2.extras import execute_values
 
-try:
-    import bz2
-
-    has_bz2 = True
-except ImportError:
-    has_bz2 = False
-
-
-READ_STDIN = '-'
-
-
-class SingleZipReader(ZipFile):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if len(self.namelist()) != 1:
-            raise ValueError('Zip-compressed sql must contain only one file.')
-
-    def read(self):
-        return super().read(self, self.namelist()[0])
+from snodas.management import utils
 
 
 class Command(BaseCommand):
@@ -44,30 +23,24 @@ class Command(BaseCommand):
         'one json file in the command line.'
     )
 
-    readers = {
-        None: (open, 'rb'),
-        '.json': (open, 'rb'),
-        '.gz': (gzip.GzipFile, 'rb'),
-        '.zip': (SingleZipReader, 'r'),
-        'stdin': (lambda *args: sys.stdin, None),
-    }
-    if has_bz2:
-        readers['.bz2'] = (bz2.BZ2File, 'r')
+    requires_system_checks = []  # type: ignore  # noqa: RUF012
 
-    requires_system_checks = []
-
-    def add_arguments(self, parser):
-        super(Command, self).add_arguments(parser)
+    def add_arguments(self, parser) -> None:
+        super().add_arguments(parser)
         parser.add_argument(
             'args',
             metavar='jsonfiles',
+            type=utils.file,
             nargs='+',
             help='json files to import. Can also use - to pass commands via stdin.',
         )
         parser.add_argument(
             '--database',
             default=DEFAULT_DB_ALIAS,
-            help='Specify a specific database to load data into. Defaults to the "default" database.',
+            help=(
+                'Specify a specific database to load data into. '
+                'Defaults to the "default" database.',
+            ),
         )
         parser.add_argument(
             '--no-transaction',
@@ -80,15 +53,12 @@ class Command(BaseCommand):
         self.verbosity = options['verbosity']
         db = options['database']
         self.conn = connections[db]
-        jf_readers = {jf: self.get_reader(jf) for jf in jsonfiles}
 
-        for jsonfile, reader in jf_readers.items():
+        for jsonfile in jsonfiles:
             self.vprint(2, f'Processing file {jsonfile}...')
 
             self.vprint(2, '...opening file...')
-            opener, mode = reader
-            self.vprint(3, f'...using reader {opener}...')
-            with opener(jsonfile, mode) as f:
+            with jsonfile.open('r') as f:
                 _json = json.load(f)
             self.vprint(2, 'File opened.')
 
@@ -131,8 +101,9 @@ class Command(BaseCommand):
         if json['duration'] != 'MONTHLY':
             raise CommandError('Data does not look like monthly streamflow data')
         start = datetime.datetime.strptime(
-            json['beginDate'], '%Y-%m-%d %H:%M:%S'
-        ).date()
+            json['beginDate'],
+            '%Y-%m-%d %H:%M:%S',
+        ).astimezone(datetime.UTC).date()
         awdb_id = json['stationTriplet']
         return self._vals_to_records(start, awdb_id, json['values'])
 
@@ -154,22 +125,3 @@ ON CONFLICT (awdb_id, month) DO UPDATE SET
             _print = pprint
         if self.verbosity >= level:
             _print(*args, **kwargs)
-
-    def get_reader(self, f):
-        """
-        Return file reader for file format per file name.
-        """
-        if f == READ_STDIN:
-            return self.readers['stdin']
-
-        if not os.path.isfile(f):
-            raise CommandError(
-                f'file could not be found: {f}',
-            )
-
-        try:
-            return self.readers[os.path.splitext(f)[1]]
-        except KeyError:
-            raise CommandError(
-                f'file is not a known format: {f}',
-            )

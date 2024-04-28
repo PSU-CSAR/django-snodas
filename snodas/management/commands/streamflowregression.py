@@ -3,11 +3,11 @@ from argparse import Namespace
 from django.core.management.base import BaseCommand
 from django.db import connection
 
-from ...constants import snodas_variables
-from ...queries import streamflow
+from snodas.constants import snodas_variables
+from snodas.queries import streamflow  # type: ignore
 
 
-def print_dict_table(my_dict, col_list=None):
+def print_dict_table(my_dict, col_list=None) -> None:
     """Pretty print a list of dictionaries (myDict) as a
     dynamically sized table. If column names (colList)
     aren't specified, they will show in random order.
@@ -27,20 +27,20 @@ def print_dict_table(my_dict, col_list=None):
     my_list.insert(1, ['-' * i for i in col_size])
 
     for item in my_list:
-        print(format_str.format(*item))
+        print(format_str.format(*item))  # noqa: T201
 
 
 class Command(BaseCommand):
     help = """Run a regression analysis to compare a
     SNODAS variable on a given date to streamflow."""
 
-    requires_system_checks = []
+    requires_system_checks = []  # type: ignore  # noqa: RUF012
     can_import_settings = True
 
     cols = snodas_variables
 
-    def add_arguments(self, parser):
-        super(Command, self).add_arguments(parser)
+    def add_arguments(self, parser) -> None:
+        super().add_arguments(parser)
         parser.add_argument(
             '-m',
             '--variable',
@@ -124,7 +124,7 @@ class Command(BaseCommand):
                 for row in cursor.fetchall()
             ]
 
-    def handle(self, *args, **options):
+    def handle(self, *_, **options) -> None:
         self.options = Namespace(**options)
         result = self.run_query()
         print_dict_table(result, self.query_cols)

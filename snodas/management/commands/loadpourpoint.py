@@ -1,10 +1,13 @@
 import json
 
+from pathlib import Path
+from typing import Any, Self
+
 from django.core.management.base import BaseCommand
 from django.db import connection
 
-from ...exceptions import GeoJSONValidationError
-from ..utils import FullPaths, is_file
+from snodas.exceptions import GeoJSONValidationError
+from snodas.management import utils
 
 TABLE = 'pourpoint.pourpoint'
 
@@ -18,12 +21,19 @@ MULTIPOLYGON = 'MultiPolygon'
 POLYGON_TYPES = [POLYGON, MULTIPOLYGON]
 
 
-def join(iterable):
+def join(iterable) -> str:
     return ', '.join(iterable)
 
 
 class Pourpoint:
-    def __init__(self, awdb_id, name, source, point, polygon=None):
+    def __init__(
+        self: Self,
+        awdb_id: str,
+        name: str,
+        source: str,
+        point,
+        polygon=None,
+    ) -> None:
         self.awdb_id = awdb_id
         self.name = name
         self.source = source
@@ -31,8 +41,8 @@ class Pourpoint:
         self.polygon = polygon
 
     @classmethod
-    def from_geojson(cls, geojson):
-        kwargs = {}
+    def from_geojson(cls: type[Self], geojson: dict[str, Any]) -> Self:
+        kwargs: dict[str, Any] = {}
         try:
             if geojson['type'] == FEATURE:
                 if geojson['geometry']['type'] != POINT:
@@ -45,7 +55,8 @@ class Pourpoint:
 
                 if len(geoms) != 2:
                     raise GeoJSONValidationError(
-                        'Multi-geometry pourpoints cannot have more than two geometries',
+                        'Multi-geometry pourpoints cannot have '
+                        'more than two geometries',
                     )
 
                 if geoms[0]['type'] == POINT:
@@ -63,7 +74,8 @@ class Pourpoint:
                     kwargs['polygon'] = geoms[1]
                 else:
                     raise GeoJSONValidationError(
-                        'Multi-geometry pourpoints must have one (Mutli)Polygon geometry',
+                        'Multi-geometry pourpoints must have one '
+                        '(Mutli)Polygon geometry',
                     )
             else:
                 raise GeoJSONValidationError(
@@ -72,7 +84,8 @@ class Pourpoint:
 
             kwargs['awdb_id'] = geojson['id']
             kwargs['name'] = geojson['properties'].get(
-                'nwccname', geojson['properties']['name']
+                'nwccname',
+                geojson['properties']['name'],
             )
             kwargs['source'] = geojson['properties']['source']
         except KeyError as e:
@@ -82,7 +95,7 @@ class Pourpoint:
 
         return cls(**kwargs)
 
-    def insert_sql(self, allow_update=False):
+    def insert_sql(self, allow_update=False) -> tuple[str, list[str]]:
         fields = ['awdb_id', 'name', 'source', 'point']
         values = ['%s', '%s', '%s', 'ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)']
         params = [self.awdb_id, self.name, self.source, json.dumps(self.point)]
@@ -92,12 +105,13 @@ class Pourpoint:
             values.append('ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)')
             params.append(json.dumps(self.polygon))
 
-        sql = f'insert into {TABLE} ({join(fields)}) values ({join(values)})'
+        sql = f'insert into {TABLE} ({join(fields)}) values ({join(values)})'  # noqa: S608
 
         if allow_update:
             updates = fields[1:]
             excludes = [f'EXCLUDED.{field}' for field in updates]
-            sql += f' on conflict (awdb_id) do update set ({join(updates)}) = ({join(excludes)})'
+            sql += ' on conflict (awdb_id) do update set '
+            sql += f'({join(updates)}) = ({join(excludes)})'
 
         return sql, params
 
@@ -110,12 +124,11 @@ class Command(BaseCommand):
  Also allows updating an existing pourpoint with the update option.
  """
 
-    def add_arguments(self, parser):
-        super(Command, self).add_arguments(parser)
+    def add_arguments(self, parser) -> None:
+        super().add_arguments(parser)
         parser.add_argument(
             'pourpoint_geojson',
-            action=FullPaths,
-            type=is_file,
+            type=utils.file,
             help='Path to a BAGIS pourpoint geojson file.',
         )
         parser.add_argument(
@@ -136,29 +149,26 @@ class Command(BaseCommand):
             help="Don't execute insert, just dump sql command",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *_, **options) -> None:
         pourpoint = self.load_pourpoint_geojson(options['pourpoint_geojson'])
 
-        print(f"Inserting pourpoint into database '{pourpoint.awdb_id}'")
+        print(f"Inserting pourpoint into database '{pourpoint.awdb_id}'")  # noqa: T201
 
         sql, params = pourpoint.insert_sql(allow_update=options['update'])
 
         if options['dry_run']:
-            print(f'SQL: {sql}')
-            print(f'PARAMS: {params}')
+            print(f'SQL: {sql}')  # noqa: T201
+            print(f'PARAMS: {params}')  # noqa: T201
             return
 
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
 
     @staticmethod
-    def load_pourpoint_geojson(geojson_file):
+    def load_pourpoint_geojson(geojson_file: Path) -> Pourpoint:
         try:
-            with open(geojson_file) as f:
-                geojson = json.load(f)
+            return Pourpoint.from_geojson(json.loads(geojson_file.read_text()))
         except json.decoder.JSONDecodeError as e:
             raise GeoJSONValidationError(
                 'Failed to parse pourpoint json',
             ) from e
-
-        return Pourpoint.from_geojson(geojson)

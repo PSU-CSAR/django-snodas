@@ -1,3 +1,5 @@
+import contextlib
+
 from getpass import getpass
 
 from django.conf import settings
@@ -5,18 +7,18 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from psycopg2 import connect
 
-from ..utils import get_default
+from snodas.management.utils import get_default
 
 
 class Command(BaseCommand):
     help = """Drops a postgresql database for this snodas instance using
     the settings defined for the current instance of the project."""
 
-    requires_system_checks = []
+    requires_system_checks = []  # type: ignore  # noqa: RUF012
     can_import_settings = True
 
     def add_arguments(self, parser):
-        super(Command, self).add_arguments(parser)
+        super().add_arguments(parser)
         parser.add_argument(
             '--drop-user',
             action='store_true',
@@ -52,7 +54,7 @@ class Command(BaseCommand):
             'the default defined in settings.py',
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *_, **options) -> None:
         if settings.DEPLOYMENT_TYPE == 'production':
             raise CommandError("I won't run on a production database. Sorry.")
 
@@ -82,13 +84,13 @@ class Command(BaseCommand):
                 'This will IRREVERSIBLY DESTROY\n'
                 f'ALL data in the database "{dbname}".\n'
                 'Are you sure you want to do this?\n'
-                'Type "yes" to continue, or "no" to cancel: '
+                'Type "yes" to continue, or "no" to cancel: ',
             )
         else:
             confirm = 'yes'
 
         if confirm != 'yes':
-            print('Drop cancelled.')
+            print('Drop cancelled.')  # noqa: T201
             return
 
         # need to make sure django is not connected to the DB
@@ -112,7 +114,5 @@ class Command(BaseCommand):
                     )
                     cursor.execute('DROP USER IF EXISTS {}'.format(dbinfo.get('USER')))
         finally:
-            try:
-                conn.close()
-            except (NameError, AttributeError):
-                pass
+            with contextlib.suppress(NameError, AttributeError):
+                conn.close()  # type: ignore
