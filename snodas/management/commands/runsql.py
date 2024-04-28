@@ -64,7 +64,6 @@ class Command(BaseCommand):
         parser.add_argument(
             'args',
             metavar='sqlfiles',
-            type=utils.file,
             nargs='+',
             help='sql files to execute. Can also use - to pass commands via stdin.',
         )
@@ -73,7 +72,7 @@ class Command(BaseCommand):
             default=DEFAULT_DB_ALIAS,
             help=(
                 'Nominates a specific database to load fixtures into. '
-                'Defaults to the "default" database.',
+                'Defaults to the "default" database.'
             ),
         )
         parser.add_argument(
