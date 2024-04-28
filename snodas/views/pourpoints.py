@@ -27,6 +27,7 @@ def get_points() -> types.PourPoints:
                 area_meters,
                 polygon is not null as has_polygon
             FROM pourpoint.pourpoint
+            ORDER BY pourpoint_id
         ) inputs
     """
 
