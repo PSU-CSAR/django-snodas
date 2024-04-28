@@ -433,6 +433,8 @@ class Install:
             return
         print('Using the following configuration settings:', flush=True)  # noqa: T201
         for key, val in sorted(self.settings.__dict__.items()):
+            if 'secret' in key.lower() or 'password' in key.lower():
+                val = '************'
             print(f'    {key} = {val}', flush=True)  # noqa: T201
 
     def vprint(self, level, *args, **kwargs) -> None:
