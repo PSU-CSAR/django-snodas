@@ -121,12 +121,7 @@ class Command(BaseCommand):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.appcmd = (
-            Path(os.environ['WINDIR'])
-            / 'system32'
-            / 'inetsrv'
-            / 'appcmd.exe'
-        )
+        self.appcmd = Path(os.environ['WINDIR']) / 'system32' / 'inetsrv' / 'appcmd.exe'
         self.project_dir = PROJECT_ROOT
         self.web_config = self.project_dir / CONFIG_FILE_NAME
 
@@ -206,7 +201,10 @@ class Command(BaseCommand):
                 f'{self.last_command_error}',
             )
 
-        binding: str = options.get('binding', f'https://{settings.SITE_DOMAIN_NAME}:443')
+        binding: str = options.get(
+            'binding',
+            f'https://{settings.SITE_DOMAIN_NAME}:443',
+        )
 
         print('Creating the site')  # noqa: T201
         if not self.run_config_command(

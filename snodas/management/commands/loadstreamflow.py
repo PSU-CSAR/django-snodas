@@ -100,10 +100,14 @@ class Command(BaseCommand):
     def _parse_json(self, json):
         if json['duration'] != 'MONTHLY':
             raise CommandError('Data does not look like monthly streamflow data')
-        start = datetime.datetime.strptime(
-            json['beginDate'],
-            '%Y-%m-%d %H:%M:%S',
-        ).astimezone(datetime.UTC).date()
+        start = (
+            datetime.datetime.strptime(
+                json['beginDate'],
+                '%Y-%m-%d %H:%M:%S',
+            )
+            .astimezone(datetime.UTC)
+            .date()
+        )
         awdb_id = json['stationTriplet']
         return self._vals_to_records(start, awdb_id, json['values'])
 

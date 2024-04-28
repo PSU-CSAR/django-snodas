@@ -140,5 +140,5 @@ class Command(BaseCommand):
         print(  # noqa: T201
             f'\nDatabase {settings.PROJECT_NAME} created. '
             'Be sure to run the data migrations:\n\n'
-              f'`{os.path.basename(sys.argv[0])} migrate [options]`',  # noqa: PTH119
+            f'`{os.path.basename(sys.argv[0])} migrate [options]`',  # noqa: PTH119
         )

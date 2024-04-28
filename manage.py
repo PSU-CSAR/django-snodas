@@ -55,7 +55,7 @@ def default_django_command():
     # activated and this would not prevent execution. I should
     # do some sort of more advanced check of the settings to verify that
     # they match the current project.
-    if find_spec("snodas.settings") is None:
+    if find_spec('snodas.settings') is None:
         logger.debug(
             "snodas.settings couldn't be imported; "
             'looks like the correct env is not activated',
