@@ -11,6 +11,7 @@ import numpy.typing
 
 from osgeo import gdal
 
+from snodas import types
 from snodas.snodas.constants import SNODAS_ORIGIN_TILE, TILE_PREFIX
 from snodas.snodas.coordinates import Pixel, Tile
 
@@ -65,11 +66,16 @@ class SNODASRaster(TiledRaster[numpy.int16]):
 
 @dataclass
 class AOIRaster:
+    path: Path
     array: numpy.typing.NDArray[numpy.float32]
     intersected_tiles: list[Tile]
     origin: Pixel
     min_elevation: float
     max_elevation: float
+
+    @property
+    def station_triplet(self: Self) -> types.StationTriplet:
+        return types.StationTriplet(self.path.stem.replace('_', ':'))
 
     @classmethod
     def open(
@@ -99,6 +105,7 @@ class AOIRaster:
         del ds
 
         return cls(
+            path=path,
             array=array,
             intersected_tiles=intersected_tiles,
             origin=origin,
@@ -146,6 +153,7 @@ class AOIRasterWithArea(AOIRaster):
         aoi_raster.load_raster_tiles_into_array(area_raster, area)
         return cls(
             area=area,
+            path=aoi_raster.path,
             array=aoi_raster.array,
             intersected_tiles=aoi_raster.intersected_tiles,
             origin=aoi_raster.origin,
