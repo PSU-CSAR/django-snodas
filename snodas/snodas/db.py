@@ -14,7 +14,7 @@ from snodas import types
 from snodas.snodas import constants
 from snodas.snodas.aoi import AOI
 from snodas.snodas.coordinates import Pixel, Tile
-from snodas.snodas.fileinfo import Product
+from snodas.snodas.fileinfo import Product, SNODASFileInfo
 from snodas.snodas.input_rasters import SNODASInputRasterSet
 from snodas.snodas.raster import DEM, AOIRaster, AreaRaster
 
@@ -384,6 +384,13 @@ class RasterDatabase:
 
         for raster in rasters:
             raster.write_cog(output_dir=output_dir, force=force)
+
+    def aoi_rasters(self: Self) -> Iterator[AOIRaster]:
+        yield from (AOIRaster.open(path) for path in self._aoi_rasters.glob('*.tif'))
+
+    def snodas_rasters(self: Self) -> Iterator[SNODASFileInfo]:
+        for date_dir in self._cogs.iterdir():
+            yield from (SNODASFileInfo(path) for path in date_dir.glob('*.tif'))
 
 
 @cache
