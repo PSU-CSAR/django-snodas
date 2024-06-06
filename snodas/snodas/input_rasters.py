@@ -40,9 +40,9 @@ class SNODASInputRaster(BaseFileInfo):
         but we trim to the smaller size to be safe."""
         line_limit = 255
         lines: list[bytes] = []
-        with hdr.open('b') as f:
+        with hdr.open('rb') as f:
             for line in f:
-                lines.append(line[: min(len(line), line_limit)] + '\n')
+                lines.append(line[: min(len(line), line_limit)] + b'\n')
 
         with hdr.open('wb') as f:
             f.writelines(lines)
