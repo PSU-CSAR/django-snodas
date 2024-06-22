@@ -1,5 +1,7 @@
-from datetime import UTC, date, datetime
+from collections.abc import Iterator
+from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum, auto
+from math import isnan
 from typing import Annotated, Literal, Protocol, Self
 
 from django.http import HttpRequest
@@ -14,6 +16,8 @@ from pydantic import (
     WithJsonSchema,
     field_serializer,
 )
+
+from snodas.snodas.fileinfo import Product
 
 YYYY = r'\d{4}'
 MM = r'(0[1-9]|1[0-2])'
@@ -186,6 +190,34 @@ class PourPoint(BaseModel):
                         ),
                         title='Query AOI statistics by day of year',
                     ),
+                    Link(
+                        rel='related',
+                        type='application/json',
+                        href=request.build_absolute_uri(
+                            reverse(
+                                f'{api.urls_namespace}:zonal_stat_range_query',
+                                args=(self.id,),
+                            ),
+                        ),
+                        title=(
+                            'Query AOI statistics by date range '
+                            'grouped into elevation zones'
+                        ),
+                    ),
+                    Link(
+                        rel='related',
+                        type='application/json',
+                        href=request.build_absolute_uri(
+                            reverse(
+                                f'{api.urls_namespace}:zonal_stat_doy_query',
+                                args=(self.id,),
+                            ),
+                        ),
+                        title=(
+                            'Query AOI statistics by day of year '
+                            'grouped into elevation zones'
+                        ),
+                    ),
                 ],
             )
 
@@ -249,8 +281,9 @@ class SnodasStats(BaseModel):
 
 
 class DateQuery(Protocol):  # pragma: no cover
-    def stat_query(self, pourpoint_id: int) -> sql.Composed: ...
-    def csv_name(self, pourpoint_name: str) -> str: ...
+    def stat_query(self: Self, pourpoint_id: int) -> sql.Composed: ...
+    def csv_name(self: Self, pourpoint_name: str) -> str: ...
+    def generate_sequence(self: Self) -> Iterator[date]: ...
 
 
 class DateRangeQuery(BaseModel):
@@ -258,7 +291,7 @@ class DateRangeQuery(BaseModel):
     start_date: date
     end_date: date
 
-    def stat_query(self, pourpoint_id: int) -> sql.Composed:
+    def stat_query(self: Self, pourpoint_id: int) -> sql.Composed:
         base_query: str = """
             SELECT
                 date,
@@ -285,14 +318,21 @@ class DateRangeQuery(BaseModel):
             sql.Literal(daterange),
         )
 
-    def csv_name(self, pourpoint_name: str) -> str:
+    def csv_name(self: Self, pourpoint_name: str) -> str:
         return '{}_{}-{}.csv'.format(
             '-'.join(pourpoint_name.split()),
             self.start_date,
             self.end_date,
         )
 
-    def __str__(self) -> str:
+    def generate_sequence(self: Self) -> Iterator[date]:
+        delta = timedelta(days=1)
+        d = self.start_date
+        while d <= self.end_date:
+            yield d
+            d += delta
+
+    def __str__(self: Self) -> str:
         return f'{self.start_date}/{self.end_date}'
 
 
@@ -303,7 +343,7 @@ class DOYQuery(BaseModel):
     start_year: Year
     end_year: Year
 
-    def stat_query(self, pourpoint_id: int) -> sql.Composed:
+    def stat_query(self: Self, pourpoint_id: int) -> sql.Composed:
         base_query: str = """
             SELECT
                 date,
@@ -334,7 +374,7 @@ class DOYQuery(BaseModel):
             sql.Literal(self.day),
         )
 
-    def csv_name(self, pourpoint_name: str) -> str:
+    def csv_name(self: Self, pourpoint_name: str) -> str:
         return '{}_{}-{}_{}-{}.csv'.format(
             '-'.join(pourpoint_name.split()),
             self.month,
@@ -343,7 +383,13 @@ class DOYQuery(BaseModel):
             self.end_year,
         )
 
-    def __str__(self) -> str:
+    def generate_sequence(self: Self) -> Iterator[date]:
+        year = self.start_year
+        while year <= self.end_year:
+            yield date(year=year, month=self.month, day=self.day)
+            year += 1
+
+    def __str__(self: Self) -> str:
         return f'{self.month}{self.day}/{self.start_year}/{self.end_year}'
 
 
@@ -370,6 +416,176 @@ class PourPointStats(BaseModel):
                     'precip_solid': 6.18786387077508,
                     'precip_liquid': 0.03673017090738538,
                     'sublimation_blowing': -6.307803776158206e-8,
+                },
+            ],
+        ],
+    )
+    links: list[Link] = []
+
+    def build_links(self: Self, request: HttpRequest, api: NinjaAPI) -> Self:
+        self.links = [
+            Link(
+                rel='self',
+                type='application/json',
+                href=request.build_absolute_uri(),
+            ),
+            Link(
+                rel='root',
+                type='application/json',
+                href=request.build_absolute_uri(
+                    reverse(
+                        f'{api.urls_namespace}:api_root',
+                    ),
+                ),
+            ),
+        ]
+        self.pourpoint.build_links(request, api)
+        return self
+
+
+class SnodasZonalStat(BaseModel):
+    min_elevation_ft: float
+    max_elevation_ft: float
+    area_m2: float = Field(..., ge=0)
+    mean_swe_mm: float | None = None
+    mean_depth_mm: float | None = None
+    mean_runoff_mm: float | None = None
+    mean_sublimation_mm: float | None = None
+    mean_precip_solid_kg_per_m2: float | None = None
+    mean_precip_liquid_kg_per_m2: float | None = None
+    mean_sublimation_blowing_mm: float | None = None
+    mean_average_temp_k: float | None = None
+
+    @field_serializer(
+        'mean_swe_mm',
+        'mean_depth_mm',
+        'mean_runoff_mm',
+        'mean_sublimation_mm',
+        'mean_precip_solid_kg_per_m2',
+        'mean_precip_liquid_kg_per_m2',
+        'mean_sublimation_blowing_mm',
+        'mean_average_temp_k',
+        when_used='always',
+    )
+    def serialize_mean_to_valid_json_value(self, mean: float) -> float | None:
+        if isnan(mean):
+            return None
+        return mean
+
+
+class SnodasZonalStats(BaseModel):
+    date: date
+    zones: list[SnodasZonalStat]
+
+
+class PourPointZonalStats(BaseModel):
+    pourpoint: PourPoint
+    products: list[Product]
+    query: PourPointQuery
+    results: list[SnodasZonalStats] = Field(
+        ...,
+        examples=[
+            [
+                {
+                    'date': '2008-12-14',
+                    'zones': [
+                        {
+                            'min_elevation_ft': -1000,
+                            'max_elevation_ft': 0,
+                            'mean_precip_solid_kg_per_m2': None,
+                            'area_m2': 0,
+                        },
+                        {
+                            'min_elevation_ft': 0,
+                            'max_elevation_ft': 1000,
+                            'mean_precip_solid_kg_per_m2': None,
+                            'area_m2': 0,
+                        },
+                        {
+                            'min_elevation_ft': 1000,
+                            'max_elevation_ft': 2000,
+                            'mean_precip_solid_kg_per_m2': None,
+                            'area_m2': 0,
+                        },
+                        {
+                            'min_elevation_ft': 2000,
+                            'max_elevation_ft': 3000,
+                            'mean_precip_solid_kg_per_m2': 7.586826324462891,
+                            'area_m2': 584802.375,
+                        },
+                        {
+                            'min_elevation_ft': 3000,
+                            'max_elevation_ft': 4000,
+                            'mean_precip_solid_kg_per_m2': 10.254584312438965,
+                            'area_m2': 588768.5,
+                        },
+                        {
+                            'min_elevation_ft': 4000,
+                            'max_elevation_ft': 5000,
+                            'mean_precip_solid_kg_per_m2': 18.460737228393555,
+                            'area_m2': 589209.5625,
+                        },
+                        {
+                            'min_elevation_ft': 5000,
+                            'max_elevation_ft': 6000,
+                            'mean_precip_solid_kg_per_m2': 28.922319412231445,
+                            'area_m2': 591220.75,
+                        },
+                        {
+                            'min_elevation_ft': 6000,
+                            'max_elevation_ft': 7000,
+                            'mean_precip_solid_kg_per_m2': 51.91190719604492,
+                            'area_m2': 592891.6875,
+                        },
+                        {
+                            'min_elevation_ft': 7000,
+                            'max_elevation_ft': 8000,
+                            'mean_precip_solid_kg_per_m2': 85.651611328125,
+                            'area_m2': 594662.375,
+                        },
+                        {
+                            'min_elevation_ft': 8000,
+                            'max_elevation_ft': 9000,
+                            'mean_precip_solid_kg_per_m2': 125.2992935180664,
+                            'area_m2': 595767.375,
+                        },
+                        {
+                            'min_elevation_ft': 9000,
+                            'max_elevation_ft': 10000,
+                            'mean_precip_solid_kg_per_m2': 118.39726257324219,
+                            'area_m2': 596972.3125,
+                        },
+                        {
+                            'min_elevation_ft': 10000,
+                            'max_elevation_ft': 11000,
+                            'mean_precip_solid_kg_per_m2': 114,
+                            'area_m2': 596847.4375,
+                        },
+                        {
+                            'min_elevation_ft': 11000,
+                            'max_elevation_ft': 12000,
+                            'mean_precip_solid_kg_per_m2': None,
+                            'area_m2': 0,
+                        },
+                        {
+                            'min_elevation_ft': 12000,
+                            'max_elevation_ft': 13000,
+                            'mean_precip_solid_kg_per_m2': None,
+                            'area_m2': 0,
+                        },
+                        {
+                            'min_elevation_ft': 13000,
+                            'max_elevation_ft': 14000,
+                            'mean_precip_solid_kg_per_m2': None,
+                            'area_m2': 0,
+                        },
+                        {
+                            'min_elevation_ft': 14000,
+                            'max_elevation_ft': 15000,
+                            'mean_precip_solid_kg_per_m2': None,
+                            'area_m2': 0,
+                        },
+                    ],
                 },
             ],
         ],

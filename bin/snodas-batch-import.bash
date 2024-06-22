@@ -29,7 +29,7 @@ dates=$(ls *.grz 2>/dev/null | grep -oP '(?<!\d)\d{8}' | sort -u)
 for date in ${dates[@]}; do
     (
         tmp=$(mktemp -d)
-	trap "rm -r $tmp" EXIT
+        trap "rm -r $tmp" EXIT
 
         year=${date:0:4}
         month=${date:4:2}
@@ -51,8 +51,8 @@ for date in ${dates[@]}; do
         file=SNODAS_${year}${month}${day}.tar
         tar -cf $file -C $tmp .
 
-	# and we can remove the original grz files
-	rm *$date*.grz
+        # and we can remove the original grz files
+        rm *$date*.grz
     )
 done
 

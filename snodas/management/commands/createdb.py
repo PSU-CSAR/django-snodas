@@ -61,7 +61,7 @@ class Command(BaseCommand):
         router = options.get('router')
         dbinfo = settings.DATABASES.get(router)
         if dbinfo is None:
-            raise CommandError('Unknown database router %s' % router)
+            raise CommandError(f'Unknown database router {router}')
 
         owner = options.get('owner')
         createuser = options.get('admin_user')

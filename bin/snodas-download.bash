@@ -2,12 +2,11 @@
 # Script to download a specific SNODAS date and import it.
 # Call it like this:
 #
-# ./$0 2018-04-27
+# ./$0 2018-04-27 OUTPUT_PATH
 #
 # Simple.
 #
 # Date format must be YYYY-MM-DD.
-# Make sure snodas is on your path (`source activate` the env).
 
 
 # Need to build a full url like
@@ -39,9 +38,4 @@ esac
 filename="SNODAS_${year}${month}${day}.tar"
 url="${url}/${year}/${mo_name}/${filename}"
 
-dir=$(mktemp -d)
-trap "rm -r ${dir}" EXIT
-
-filepath="${dir}/${filename}"
-curl "${url}" -o "${filepath}"
-snodas loadraster "${filepath}"
+curl "${url}" -o "$2"

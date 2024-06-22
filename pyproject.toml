@@ -12,14 +12,18 @@ authors = [
 description = 'Interface to SNODAS daily and aggregate rasters as a tile service and for analytical functions.'
 requires-python = '>=3.12'
 dependencies = [
+    'area',
     'Django',
     'django-ninja',
     'django-split-settings',
     'django-cors-headers',
+    'gdal',
+    'numpy',
     'psycopg2-binary',
     'pydantic',
     'pyyaml',
     'sqlparse',
+    'waitress',
 ]
 dynamic = [
   'readme',
@@ -35,6 +39,12 @@ Repository = 'https://github.com/PSU-CSAR/django-snodas'
 [tool.setuptools]
 packages = ['snodas']
 py-modules = ['manage']
+script-files = [
+    'bin/snodas-dump-pourpoints.bash',
+    'bin/snodas-batch-import.bash',
+    'bin/snodas-download.bash',
+    'bin/snodas-streamflow-import.bash',
+]
 
 [tool.setuptools.dynamic]
 readme = {file = 'README.md'}

@@ -59,6 +59,7 @@ class Settings:
     SITE_DOMAIN_NAME: str
     ADDITIONAL_SETTINGS_FILES: list[str]
     CONDA_ENV_NAME: str
+    SNODAS_RASTERDB: str
     DATABASE_HOST: str | None = None
     DATABASE_PORT: int | None = None
 
@@ -78,6 +79,7 @@ class Settings:
         *,
         deployment_type: str,
         project_name: str,
+        raster_db: Path,
         db_name: str | None = None,
         db_user: str | None = None,
         db_password: str | None = None,
@@ -108,6 +110,7 @@ class Settings:
                 additional_settings_file if additional_settings_file else []
             ),
             CONDA_ENV_NAME=(env_name if env_name else project_name),
+            SNODAS_RASTERDB=str(raster_db),
         )
 
 
@@ -212,6 +215,16 @@ class Install:
             help=(
                 'Port for the DB server. '
                 'Default is None, which will use postgres default.'
+            ),
+        )
+        parser.add_argument(
+            '--raster-db',
+            required=True,
+            type=Path,
+            help=(
+                'Path of the directory containing (or to contain) '
+                'the raster database. New raster databases can be '
+                'initialized with the `createrasterdb` command.'
             ),
         )
         parser.add_argument(
@@ -518,6 +531,7 @@ class Install:
             '\nNext, activate the new conda env for the project:\n\n'
             f'`conda activate {self.settings.PROJECT_NAME}`\n\n'
             'Then, setup any required services for this instance:\n\n'
+            '`snodas createrasterdb INPUT_DEM  # creates raster db`\n'
             '`snodas createdb [options]  # creates a postgres DB`\n'
             '`snodas setupiis [options]  # creates a site in IIS`\n\n'
             'Once the services are configured, '
