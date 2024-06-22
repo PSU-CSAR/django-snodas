@@ -2,7 +2,7 @@
 # Script to download a specific SNODAS date and import it.
 # Call it like this:
 #
-# ./$0 2018-04-27
+# ./$0 2018-04-27 OUTPUT_PATH
 #
 # Simple.
 #
@@ -38,4 +38,4 @@ esac
 filename="SNODAS_${year}${month}${day}.tar"
 url="${url}/${year}/${mo_name}/${filename}"
 
-curl "${url}"
+curl "${url}" -o "$2"
