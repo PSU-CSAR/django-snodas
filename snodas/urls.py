@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+from enum import StrEnum
 from io import StringIO
+from typing import Self
 
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
@@ -15,6 +19,21 @@ from snodas.views import (
     stats,
     tiles,
 )
+
+
+class ResponseFormat(StrEnum):
+    JSON = 'json'
+    CSV = 'csv'
+
+    @classmethod
+    def from_request(cls: type[Self], request: HttpRequest) -> ResponseFormat:
+        # default to application/json, even if not explicitly accepted
+        # only fall down to csv if it is accepted and json is not
+        # have to check it first for Accepts values like */*
+        if request.accepts('application/json') or not request.accepts('text/csv'):
+            return cls.JSON
+        return cls.CSV
+
 
 api = NinjaAPI()
 
@@ -160,17 +179,12 @@ def get_pourpoint_by_triplet(
     )
 
 
-@api.get(
-    '/pourpoints/{pourpoint_id}/stats/date-range',
-    response=types.PourPointStats,
-    exclude_none=True,
-)
-def id_stat_range_query(
+def basic_stats(
     request: HttpRequest,
     pourpoint_id: int,
-    start_date: types.Date,
-    end_date: types.Date,
-) -> types.PourPointStats:
+    query: types.PourPointQuery,
+    response_format: ResponseFormat = ResponseFormat.JSON,
+) -> HttpResponse | StreamingHttpResponse:
     pourpoint = pourpoints.get_point(pourpoint_id).build_links(
         request,
         api,
@@ -182,18 +196,56 @@ def id_stat_range_query(
             message='Pourpoint does not have an AOI polygon',
         )
 
+    if response_format == ResponseFormat.JSON:
+        return Response(
+            types.PourPointStats(
+                pourpoint=pourpoint,
+                query=query,
+                results=stats.get_pourpoint_stats(
+                    pourpoint.id,
+                    query,
+                ),
+            )
+            .build_links(
+                request,
+                api,
+            )
+            .model_dump(
+                exclude_unset=True,
+                exclude_none=True,
+            ),
+        )
+
+    return stats.get_csv_statistics(
+        request,
+        pourpoint_id,
+        query,
+    )
+
+
+@api.get(
+    '/pourpoints/{pourpoint_id}/stats/date-range',
+    response=types.PourPointStats,
+    exclude_none=True,
+)
+def id_stat_range_query(
+    request: HttpRequest,
+    pourpoint_id: int,
+    start_date: types.Date,
+    end_date: types.Date,
+    format: ResponseFormat | None = None,
+) -> HttpResponse | StreamingHttpResponse:
     query = types.DateRangeQuery(
         start_date=start_date,
         end_date=end_date,
     )
-    return types.PourPointStats(
-        pourpoint=pourpoint,
+
+    return basic_stats(
+        request=request,
+        pourpoint_id=pourpoint_id,
         query=query,
-        results=stats.get_pourpoint_stats(
-            pourpoint.id,
-            query,
-        ),
-    ).build_links(request, api)
+        response_format=(format if format else ResponseFormat.from_request(request)),
+    )
 
 
 @api.get(
@@ -208,32 +260,21 @@ def id_stat_doy_query(
     day: types.Day,
     start_year: types.Year = 2004,
     end_year: types.Year = 9999,
-):
-    pourpoint = pourpoints.get_point(pourpoint_id).build_links(
-        request,
-        api,
-    )
-
-    if not pourpoint.properties.area_meters:
-        raise HttpError(
-            status_code=409,
-            message='Pourpoint does not have an AOI polygon',
-        )
-
+    format: ResponseFormat | None = None,
+) -> HttpResponse | StreamingHttpResponse:
     query = types.DOYQuery(
         month=month,
         day=day,
         start_year=start_year,
         end_year=end_year,
     )
-    return types.PourPointStats(
-        pourpoint=pourpoint,
+
+    return basic_stats(
+        request=request,
+        pourpoint_id=pourpoint_id,
         query=query,
-        results=stats.get_pourpoint_stats(
-            pourpoint.id,
-            query,
-        ),
-    ).build_links(request, api)
+        response_format=(format if format else ResponseFormat.from_request(request)),
+    )
 
 
 def zonal_stats(
@@ -242,6 +283,7 @@ def zonal_stats(
     query: types.PourPointQuery,
     products: Query[list[Product]],
     elevation_band_step_ft: int = 1000,
+    response_format: ResponseFormat = ResponseFormat.JSON,
 ) -> HttpResponse | StreamingHttpResponse:
     # deduplicate products
     products = list(set(products))
@@ -264,10 +306,7 @@ def zonal_stats(
         elevation_band_step_feet=elevation_band_step_ft,
     )
 
-    # default to application/json, even if not explicitly accepted
-    # only fall down to csv if it is accepted and json is not
-    # have to check it first for Accepts values like */*
-    if request.accepts('application/json') or not request.accepts('text/csv'):
+    if response_format == ResponseFormat.JSON:
         return Response(
             types.PourPointZonalStats(
                 pourpoint=pourpoint,
@@ -297,6 +336,7 @@ def zonal_stats(
 
 @api.get(
     '/pourpoints/{pourpoint_id}/zonal-stats/date-range',
+    response=types.PourPointZonalStats,
     exclude_none=True,
     exclude_unset=True,
 )
@@ -307,6 +347,7 @@ def zonal_stat_range_query(
     start_date: types.Date,
     end_date: types.Date,
     elevation_band_step_ft: int = 1000,
+    format: ResponseFormat | None = None,
 ) -> HttpResponse | StreamingHttpResponse:
     query = types.DateRangeQuery(
         start_date=start_date,
@@ -319,11 +360,13 @@ def zonal_stat_range_query(
         query,
         products,
         elevation_band_step_ft,
+        response_format=(format if format else ResponseFormat.from_request(request)),
     )
 
 
 @api.get(
     '/pourpoints/{pourpoint_id}/zonal-stats/doy',
+    response=types.PourPointZonalStats,
     exclude_none=True,
     exclude_unset=True,
 )
@@ -336,6 +379,7 @@ def zonal_stat_doy_query(
     start_year: types.Year = 2004,
     end_year: types.Year = 9999,
     elevation_band_step_ft: int = 1000,
+    format: ResponseFormat | None = None,
 ) -> HttpResponse | StreamingHttpResponse:
     query = types.DOYQuery(
         month=month,
@@ -350,6 +394,7 @@ def zonal_stat_doy_query(
         query,
         products,
         elevation_band_step_ft,
+        response_format=(format if format else ResponseFormat.from_request(request)),
     )
 
 
