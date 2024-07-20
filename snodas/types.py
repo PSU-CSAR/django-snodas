@@ -282,7 +282,7 @@ class SnodasStats(BaseModel):
 
 class DateQuery(Protocol):  # pragma: no cover
     def stat_query(self: Self, pourpoint_id: int) -> sql.Composed: ...
-    def csv_name(self: Self, pourpoint_name: str) -> str: ...
+    def csv_name(self: Self, pourpoint_name: str, zone_size: int = 0) -> str: ...
     def generate_sequence(self: Self) -> Iterator[date]: ...
 
 
@@ -318,11 +318,12 @@ class DateRangeQuery(BaseModel):
             sql.Literal(daterange),
         )
 
-    def csv_name(self: Self, pourpoint_name: str) -> str:
-        return '{}_{}-{}.csv'.format(
+    def csv_name(self: Self, pourpoint_name: str, zone_size: int = 0) -> str:
+        return '{}_{}-{}{}.csv'.format(
             '-'.join(pourpoint_name.split()),
             self.start_date,
             self.end_date,
+            f'_zonal_{zone_size}' if zone_size else '',
         )
 
     def generate_sequence(self: Self) -> Iterator[date]:
@@ -374,13 +375,14 @@ class DOYQuery(BaseModel):
             sql.Literal(self.day),
         )
 
-    def csv_name(self: Self, pourpoint_name: str) -> str:
-        return '{}_{}-{}_{}-{}.csv'.format(
+    def csv_name(self: Self, pourpoint_name: str, zone_size: int = 0) -> str:
+        return '{}_{}-{}_{}-{}{}.csv'.format(
             '-'.join(pourpoint_name.split()),
             self.month,
             self.day,
             self.start_year,
             self.end_year,
+            f'_zonal_{zone_size}' if zone_size else '',
         )
 
     def generate_sequence(self: Self) -> Iterator[date]:

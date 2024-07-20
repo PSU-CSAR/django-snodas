@@ -328,7 +328,7 @@ def zonal_stats(
     results.dump_to_csv(flike)
     return stream_file(
         flike,
-        query.csv_name(pourpoint.properties.name),
+        query.csv_name(pourpoint.properties.name, zone_size=elevation_band_step_ft),
         request,
         'text/csv',
     )
