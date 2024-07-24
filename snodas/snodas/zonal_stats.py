@@ -206,7 +206,7 @@ class ZonalStats:
                     product=product,
                     elevation_band=band,
                     mean=float(numpy.average(values_array[selection])),
-                    area=float(numpy.average(aoi.area[selection])),
+                    area=float(numpy.sum(aoi.area[selection])),
                 ),
             )
 
