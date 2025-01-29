@@ -8,8 +8,6 @@ from getpass import getpass
 from pathlib import Path
 from typing import Self
 
-import yaml
-
 try:
     from django.core.management.base import (
         BaseCommand,
@@ -60,12 +58,11 @@ class Settings:
     ADDITIONAL_SETTINGS_FILES: list[str]
     CONDA_ENV_NAME: str
     SNODAS_RASTERDB: str
+    SUBDOMAINS: list[str]
     DATABASE_HOST: str | None = None
     DATABASE_PORT: int | None = None
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
+    def __post_init__(self: Self) -> None:
         pyfile: str = self.DEPLOYMENT_TYPE + '.py'
         if not utils.get_settings_file(pyfile).is_file():
             warnings.warn(
@@ -330,6 +327,8 @@ class Install:
         parser.print_help()
 
     def write_conf_file(self):
+        import yaml
+
         with self.output_file.open('w') as f:
             f.write('# This file contains SECRET information!\n')
             f.write('# Keep the contents of the file private,\n')
