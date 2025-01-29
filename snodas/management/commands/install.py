@@ -334,7 +334,7 @@ class Install:
             f.write('# Keep the contents of the file private,\n')
             f.write('# especially for production instances.\n')
             f.write('# DO NOT commit this file.\n\n')
-            yaml.dump(self.settings, f, default_flow_style=False)
+            yaml.dump(vars(self.settings), f, default_flow_style=False)
 
         self.vprint(
             2,
