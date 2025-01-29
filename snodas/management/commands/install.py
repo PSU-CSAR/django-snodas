@@ -100,7 +100,7 @@ class Settings:
                 else get_password('Please enter the database user password: ')
             ),
             DATABASE_HOST=db_host,
-            DATABASE_PORT=db_port,
+            DATABASE_PORT=int(db_port) if db_port is not None else None,
             SITE_DOMAIN_NAME=domain_name,
             SUBDOMAINS=[],
             ADDITIONAL_SETTINGS_FILES=(
