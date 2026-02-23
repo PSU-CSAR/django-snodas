@@ -8,6 +8,10 @@ from ..management.utils import load_conf_file
 
 conf_settings = load_conf_file()
 
+# Set GDAL and GEOS library paths (configurable via project.conf)
+GDAL_LIBRARY_PATH = conf_settings.get('GDAL_LIBRARY_PATH', '/usr/local/lib/libgdal.dylib')
+GEOS_LIBRARY_PATH = conf_settings.get('GEOS_LIBRARY_PATH', '/opt/homebrew/lib/libgeos_c.dylib')
+
 user_override = os.environ.get('SNODAS_DATABASE_USER')
 password_override = os.environ.get('SNODAS_DATABASE_PASSWORD')
 
